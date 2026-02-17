@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import Button from '@/components/ui/Button'
 import { QUIZ_QUESTIONS } from '@/lib/constants/gameData'
+import { updateTickets, saveQuizScore, getGameProgress } from '@/lib/supabase/helpers'
 
 export default function QuizPage() {
     const router = useRouter()
@@ -13,8 +14,41 @@ export default function QuizPage() {
     const [score, setScore] = useState(0)
     const [showResult, setShowResult] = useState(false)
     const [showMessage, setShowMessage] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [hasDeductedTicket, setHasDeductedTicket] = useState(false)
+    const [currentTickets, setCurrentTickets] = useState<number | null>(null)
 
     const question = QUIZ_QUESTIONS[currentQuestion]
+
+    // Deduct ticket when game starts
+    useEffect(() => {
+        async function deductTicket() {
+            if (!hasDeductedTicket) {
+                try {
+                    await updateTickets(-1)
+                    setHasDeductedTicket(true)
+                } catch (error) {
+                    console.error('Failed to deduct ticket:', error)
+                }
+            }
+        }
+        deductTicket()
+    }, [hasDeductedTicket])
+
+    // Load current tickets for replay validation
+    useEffect(() => {
+        async function loadTickets() {
+            try {
+                const progress = await getGameProgress()
+                setCurrentTickets(progress.tickets)
+            } catch (error) {
+                console.error('Failed to load tickets:', error)
+            }
+        }
+        if (showResult) {
+            loadTickets()
+        }
+    }, [showResult])
 
     const handleAnswerClick = (index: number) => {
         if (selectedAnswer !== null) return
@@ -28,22 +62,39 @@ export default function QuizPage() {
         setShowMessage(true)
     }
 
-    const handleNext = () => {
+    const handleNext = async () => {
         if (currentQuestion < QUIZ_QUESTIONS.length - 1) {
             setCurrentQuestion(prev => prev + 1)
             setSelectedAnswer(null)
             setShowMessage(false)
         } else {
-            setShowResult(true)
+            // Save score to database before showing result
+            setIsSaving(true)
+            try {
+                await saveQuizScore(score + (selectedAnswer === question.correctAnswer ? 1 : 0), QUIZ_QUESTIONS.length)
+            } catch (error) {
+                console.error('Failed to save quiz score:', error)
+            } finally {
+                setIsSaving(false)
+                setShowResult(true)
+            }
         }
     }
 
-    const resetQuiz = () => {
+    const resetQuiz = async () => {
+        // Check if user has enough tickets
+        if (currentTickets !== null && currentTickets <= 0) {
+            alert('Tiket kamu habis! Login besok untuk mendapat tiket baru 🎫')
+            router.push('/lobby')
+            return
+        }
+
         setCurrentQuestion(0)
         setSelectedAnswer(null)
         setScore(0)
         setShowResult(false)
         setShowMessage(false)
+        setHasDeductedTicket(false) // Reset ticket deduction flag for replay
     }
 
     const getScoreMessage = () => {
@@ -126,14 +177,14 @@ export default function QuizPage() {
                                         key={index}
                                         onClick={() => handleAnswerClick(index)}
                                         className={`w-full p-4 rounded-xl text-left font-body transition-all ${selectedAnswer === null
-                                                ? 'bg-white hover:bg-primary-50 border-2 border-gray-200 hover:border-primary-300'
-                                                : selectedAnswer === index
-                                                    ? index === question.correctAnswer
-                                                        ? 'bg-green-100 border-2 border-green-500'
-                                                        : 'bg-red-100 border-2 border-red-500'
-                                                    : index === question.correctAnswer
-                                                        ? 'bg-green-100 border-2 border-green-500'
-                                                        : 'bg-gray-100 border-2 border-gray-300'
+                                            ? 'bg-white hover:bg-primary-50 border-2 border-gray-200 hover:border-primary-300'
+                                            : selectedAnswer === index
+                                                ? index === question.correctAnswer
+                                                    ? 'bg-green-100 border-2 border-green-500'
+                                                    : 'bg-red-100 border-2 border-red-500'
+                                                : index === question.correctAnswer
+                                                    ? 'bg-green-100 border-2 border-green-500'
+                                                    : 'bg-gray-100 border-2 border-gray-300'
                                             }`}
                                         disabled={selectedAnswer !== null}
                                         whileHover={selectedAnswer === null ? { scale: 1.02 } : {}}
@@ -168,8 +219,8 @@ export default function QuizPage() {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                             >
-                                <Button variant="primary" size="lg" onClick={handleNext}>
-                                    {currentQuestion < QUIZ_QUESTIONS.length - 1 ? 'Lanjut →' : 'Lihat Hasil 🎉'}
+                                <Button variant="primary" size="lg" onClick={handleNext} disabled={isSaving}>
+                                    {isSaving ? 'Menyimpan...' : currentQuestion < QUIZ_QUESTIONS.length - 1 ? 'Lanjut →' : 'Lihat Hasil 🎉'}
                                 </Button>
                             </motion.div>
                         )}

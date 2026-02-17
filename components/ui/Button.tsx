@@ -1,9 +1,9 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import { ButtonHTMLAttributes, ReactNode } from 'react'
+import { motion, HTMLMotionProps } from 'framer-motion'
+import { ReactNode } from 'react'
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends HTMLMotionProps<"button"> {
     children: ReactNode
     variant?: 'primary' | 'secondary' | 'accent'
     size?: 'sm' | 'md' | 'lg'
@@ -19,15 +19,15 @@ export default function Button({
     const baseStyles = 'font-heading font-semibold rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed'
 
     const variantStyles = {
-        primary: 'bg-gradient-to-r from-primary-400 to-primary-500 text-white hover:from-primary-500 hover:to-primary-600 shadow-lg hover:shadow-xl',
-        secondary: 'bg-gradient-to-r from-secondary-400 to-secondary-500 text-white hover:from-secondary-500 hover:to-secondary-600 shadow-lg hover:shadow-xl',
+        primary: 'bg-white text-primary-600 border-2 border-primary-100 hover:border-primary-300 shadow-lg shadow-pink-100 hover:shadow-xl hover:shadow-pink-200 transition-all duration-300',
+        secondary: 'bg-white/80 backdrop-blur-sm text-gray-700 border border-white/50 hover:bg-white hover:text-primary-600 shadow-sm hover:shadow-md',
         accent: 'bg-gradient-to-r from-accent-200 to-accent-300 text-gray-800 hover:from-accent-300 hover:to-accent-400 shadow-md hover:shadow-lg',
     }
 
     const sizeStyles = {
         sm: 'px-4 py-2 text-sm',
-        md: 'px-6 py-3 text-base',
-        lg: 'px-8 py-4 text-lg',
+        md: 'px-8 py-3 text-base', // Increased padding for better touch target
+        lg: 'px-10 py-4 text-lg',
     }
 
     return (

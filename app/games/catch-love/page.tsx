@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import Button from '@/components/ui/Button'
+import { updateTickets, saveCatchLoveScore, getGameProgress } from '@/lib/supabase/helpers'
 
 interface FallingObject {
     id: number
@@ -14,7 +15,8 @@ interface FallingObject {
 }
 
 const GAME_DURATION = 60 // seconds
-const EMOJIS = ['💖', '💝', '💕', '💗', '💓', '💞', '💘']
+const MAX_OBJECTS = 12 // Limit simultaneous falling objects for performance
+const FALLING_CHAR = '•' // Simple dot for better performance
 
 export default function CatchLovePage() {
     const router = useRouter()
@@ -24,12 +26,29 @@ export default function CatchLovePage() {
     const [isGameOver, setIsGameOver] = useState(false)
     const [basketPosition, setBasketPosition] = useState(50) // percentage
     const [fallingObjects, setFallingObjects] = useState<FallingObject[]>([])
+    const [isSaving, setIsSaving] = useState(false)
+    const [hasDeductedTicket, setHasDeductedTicket] = useState(false)
+    const [heartsCaught, setHeartsCaught] = useState(0)
+    const [currentTickets, setCurrentTickets] = useState<number | null>(null)
     const gameAreaRef = useRef<HTMLDivElement>(null)
     const nextIdRef = useRef(0)
 
     // Start game
-    const startGame = () => {
+    const startGame = async () => {
+        // Reset ticket deduction flag
+        setHasDeductedTicket(false)
+
+        // Deduct ticket when starting game
+        try {
+            await updateTickets(-1)
+            setHasDeductedTicket(true)
+        } catch (error) {
+            console.error('Failed to deduct ticket:', error)
+            return // Don't start game if ticket deduction fails
+        }
+
         setScore(0)
+        setHeartsCaught(0)
         setTimeLeft(GAME_DURATION)
         setIsPlaying(true)
         setIsGameOver(false)
@@ -42,7 +61,19 @@ export default function CatchLovePage() {
         if (!isPlaying || timeLeft <= 0) {
             if (timeLeft <= 0 && isPlaying) {
                 setIsPlaying(false)
-                setIsGameOver(true)
+
+                // Save score to database
+                setIsSaving(true)
+                saveCatchLoveScore(score, heartsCaught)
+                    .then(() => {
+                        setIsSaving(false)
+                        setIsGameOver(true)
+                    })
+                    .catch((error) => {
+                        console.error('Failed to save catch love score:', error)
+                        setIsSaving(false)
+                        setIsGameOver(true)
+                    })
             }
             return
         }
@@ -52,27 +83,47 @@ export default function CatchLovePage() {
         }, 1000)
 
         return () => clearInterval(timer)
-    }, [isPlaying, timeLeft])
+    }, [isPlaying, timeLeft, score, heartsCaught])
 
-    // Spawn falling objects
+    // Load tickets when game ends
+    useEffect(() => {
+        async function loadTickets() {
+            try {
+                const progress = await getGameProgress()
+                setCurrentTickets(progress.tickets)
+            } catch (error) {
+                console.error('Failed to load tickets:', error)
+            }
+        }
+        if (isGameOver) {
+            loadTickets()
+        }
+    }, [isGameOver])
+
+    // Spawn falling objects - REDUCED RATE FOR PERFORMANCE
     useEffect(() => {
         if (!isPlaying) return
 
         const interval = setInterval(() => {
-            const newObject: FallingObject = {
-                id: nextIdRef.current++,
-                x: Math.random() * 90, // 0-90%
-                y: -10,
-                speed: 2 + Math.random() * 2,
-                emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)]
-            }
-            setFallingObjects(prev => [...prev, newObject])
-        }, 800)
+            setFallingObjects(prev => {
+                // Limit max objects for performance
+                if (prev.length >= MAX_OBJECTS) return prev
+
+                const newObject: FallingObject = {
+                    id: nextIdRef.current++,
+                    x: Math.random() * 90, // 0-90%
+                    y: -10,
+                    speed: 2 + Math.random() * 1.5,
+                    emoji: FALLING_CHAR
+                }
+                return [...prev, newObject]
+            })
+        }, 1500) // Increased for better performance
 
         return () => clearInterval(interval)
     }, [isPlaying])
 
-    // Update falling objects
+    // Update falling objects - OPTIMIZED WITH LONGER INTERVAL
     useEffect(() => {
         if (!isPlaying) return
 
@@ -95,6 +146,7 @@ export default function CatchLovePage() {
                         obj.x <= basketPosition + basketWidth / 2
                     ) {
                         setScore(s => s + 10)
+                        setHeartsCaught(h => h + 1)
                         obj.y = 200 // Remove from screen
                     }
                 })
@@ -102,10 +154,10 @@ export default function CatchLovePage() {
                 // Remove objects that are off screen
                 return updated.filter(obj => obj.y < 100)
             })
-        }, 50)
+        }, 60) // 60ms = ~16fps for smooth animation
 
         return () => clearInterval(interval)
-    }, [isPlaying, basketPosition])
+    }, [isPlaying, basketPosition]) // Removed startTime - it's constant
 
     // Handle mouse/touch movement
     const handleMove = (clientX: number) => {
@@ -166,7 +218,7 @@ export default function CatchLovePage() {
                             Cara Bermain
                         </h2>
                         <p className="text-gray-700 font-body mb-6">
-                            Gerakkan keranjang (💖) menggunakan mouse atau jari untuk menangkap cinta yang jatuh!<br />
+                            Gerakkan keranjang (🧺) menggunakan mouse atau jari untuk menangkap titik-titik yang jatuh!<br />
                             Kamu punya 60 detik untuk mengumpulkan score sebanyak-banyaknya!
                         </p>
                         <Button variant="primary" size="lg" onClick={startGame}>
@@ -217,34 +269,33 @@ export default function CatchLovePage() {
                         onMouseMove={(e) => handleMove(e.clientX)}
                         onTouchMove={(e) => handleMove(e.touches[0].clientX)}
                     >
-                        {/* Falling Objects */}
+                        {/* Falling Objects - Plain divs for performance */}
                         {fallingObjects.map(obj => (
-                            <motion.div
+                            <div
                                 key={obj.id}
-                                className="absolute text-4xl"
+                                className="absolute text-4xl font-bold text-gray-700 transition-none"
                                 style={{
                                     left: `${obj.x}%`,
                                     top: `${obj.y}%`,
+                                    transform: 'translate(-50%, -50%)',
+                                    willChange: 'top'
                                 }}
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
                             >
                                 {obj.emoji}
-                            </motion.div>
+                            </div>
                         ))}
 
-                        {/* Basket */}
-                        <motion.div
-                            className="absolute bottom-[10%] text-5xl"
+                        {/* Basket - No animation for better performance */}
+                        <div
+                            className="absolute bottom-[10%] text-5xl transition-none"
                             style={{
                                 left: `${basketPosition}%`,
                                 transform: 'translateX(-50%)',
+                                willChange: 'left'
                             }}
-                            animate={{ scale: [1, 1.1, 1] }}
-                            transition={{ duration: 0.5, repeat: Infinity }}
                         >
-                            💖
-                        </motion.div>
+                            🧺
+                        </div>
 
                         {/* Instructions */}
                         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 glass rounded-lg px-4 py-2">

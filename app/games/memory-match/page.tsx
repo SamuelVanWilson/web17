@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import Button from '@/components/ui/Button'
+import { updateTickets, saveMemoryMatchScore, getGameProgress } from '@/lib/supabase/helpers'
 
 // Sample memory photos for cards (will be replaced with actual photos)
 const CARD_IMAGES = [
@@ -25,6 +26,11 @@ export default function MemoryMatchPage() {
     const [matchedPairs, setMatchedPairs] = useState(0)
     const [moves, setMoves] = useState(0)
     const [isWon, setIsWon] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [hasDeductedTicket, setHasDeductedTicket] = useState(false)
+    const [startTime] = useState(Date.now())
+    const [currentTickets, setCurrentTickets] = useState<number | null>(null)
+    const [isChecking, setIsChecking] = useState(false)
 
     // Initialize cards
     useEffect(() => {
@@ -34,59 +40,163 @@ export default function MemoryMatchPage() {
         setCards(shuffled)
     }, [])
 
+    // Deduct ticket when game starts
+    useEffect(() => {
+        async function deductTicket() {
+            if (!hasDeductedTicket) {
+                try {
+                    await updateTickets(-1)
+                    setHasDeductedTicket(true)
+                } catch (error) {
+                    console.error('Failed to deduct ticket:', error)
+                }
+            }
+        }
+        deductTicket()
+    }, [hasDeductedTicket])
+
+    // Load current tickets when game is won
+    useEffect(() => {
+        async function loadTickets() {
+            try {
+                const progress = await getGameProgress()
+                setCurrentTickets(progress.tickets)
+            } catch (error) {
+                console.error('Failed to load tickets:', error)
+            }
+        }
+        if (isWon) {
+            loadTickets()
+        }
+    }, [isWon])
+
+    // Check for win condition when cards state changes
+    useEffect(() => {
+        // Don't check if already won or still saving or no cards yet
+        if (isWon || isSaving || cards.length === 0) return
+
+        const matchedCount = cards.filter(card => card.isMatched).length
+        console.log(`🔍 Checking win condition: ${matchedCount}/12 cards matched`)
+
+        // Win when ALL 12 cards are matched
+        if (matchedCount === 12 && !isChecking) {
+            console.log('🎉 ALL 12 CARDS MATCHED! All cards are open!')
+            // Wait a bit so user can see all 12 cards opened with green background
+            setTimeout(async () => {
+                console.log('🎊 Now showing win popup!')
+
+                // Calculate time taken
+                const timeSeconds = Math.floor((Date.now() - startTime) / 1000)
+
+                // Save score to database
+                setIsSaving(true)
+                try {
+                    await saveMemoryMatchScore(moves, timeSeconds)
+                    console.log('✅ Score saved successfully!')
+                } catch (error: any) {
+                    console.error('Failed to save memory match score:', {
+                        message: error?.message || 'Unknown error',
+                        code: error?.code,
+                        details: error?.details,
+                        name: error?.name
+                    })
+                } finally {
+                    setIsSaving(false)
+                    setIsWon(true)
+                }
+            }, 1500)
+        }
+    }, [cards, isWon, isSaving, isChecking, startTime, moves])
+
     const handleCardClick = useCallback((id: number) => {
-        if (flippedCards.length === 2 || cards[id].isMatched || flippedCards.includes(id)) {
+        // Prevent interaction during checking, or if card is already flipped/matched
+        setCards(currentCards => {
+            const clickedCard = currentCards.find(card => card.id === id)
+
+            // Don't allow interaction if card not found
+            if (!clickedCard) {
+                return currentCards
+            }
+
+            setFlippedCards(currentFlipped => {
+                // Don't allow clicks if we're checking, already have 2 flipped, or card is already matched/flipped
+                if (isChecking || currentFlipped.length === 2 || clickedCard.isMatched || currentFlipped.includes(id)) {
+                    return currentFlipped
+                }
+
+                const newFlippedCards = [...currentFlipped, id]
+
+                // Update card to flipped state
+                const updatedCards = currentCards.map(card =>
+                    card.id === id ? { ...card, isFlipped: true } : card
+                )
+                setCards(updatedCards)
+
+                // Check for match when 2 cards are flipped
+                if (newFlippedCards.length === 2) {
+                    setIsChecking(true)
+                    setMoves(prev => prev + 1)
+                    const [first, second] = newFlippedCards
+
+                    // Find the actual cards to compare their emojis
+                    const firstCard = updatedCards.find(card => card.id === first)
+                    const secondCard = updatedCards.find(card => card.id === second)
+
+                    if (firstCard && secondCard && firstCard.emoji === secondCard.emoji) {
+                        // Match found!
+                        console.log('✅ Match found!', {
+                            firstCard: firstCard.emoji,
+                            secondCard: secondCard.emoji,
+                            firstId: first,
+                            secondId: second
+                        })
+
+                        setTimeout(() => {
+                            setCards(prev =>
+                                prev.map(card =>
+                                    card.id === first || card.id === second
+                                        ? { ...card, isMatched: true }
+                                        : card
+                                )
+                            )
+                            setMatchedPairs(prev => {
+                                const newMatchedPairs = prev + 1
+                                console.log(`🎯 Matched pairs: ${newMatchedPairs}/6 (${newMatchedPairs * 2}/12 cards)`)
+                                return newMatchedPairs
+                            })
+                            setFlippedCards([])
+                            setIsChecking(false)
+                        }, 600)
+                    } else {
+                        // No match
+                        setTimeout(() => {
+                            setCards(prev =>
+                                prev.map(card =>
+                                    card.id === first || card.id === second
+                                        ? { ...card, isFlipped: false }
+                                        : card
+                                )
+                            )
+                            setFlippedCards([])
+                            setIsChecking(false)
+                        }, 1000)
+                    }
+                }
+
+                return newFlippedCards
+            })
+            return currentCards
+        })
+    }, [isChecking, startTime, moves])
+
+    const resetGame = async () => {
+        // Check if user has enough tickets
+        if (currentTickets !== null && currentTickets <= 0) {
+            alert('Tiket kamu habis! Login besok untuk mendapat tiket baru 🎫')
+            router.push('/lobby')
             return
         }
 
-        const newFlippedCards = [...flippedCards, id]
-        setFlippedCards(newFlippedCards)
-
-        // Update card state
-        setCards(prev =>
-            prev.map(card => card.id === id ? { ...card, isFlipped: true } : card)
-        )
-
-        // Check for match when 2 cards are flipped
-        if (newFlippedCards.length === 2) {
-            setMoves(prev => prev + 1)
-            const [first, second] = newFlippedCards
-
-            if (CARD_IMAGES[first] === CARD_IMAGES[second]) {
-                // Match found!
-                setTimeout(() => {
-                    setCards(prev =>
-                        prev.map(card =>
-                            card.id === first || card.id === second
-                                ? { ...card, isMatched: true }
-                                : card
-                        )
-                    )
-                    setMatchedPairs(prev => prev + 1)
-                    setFlippedCards([])
-
-                    // Check for win
-                    if (matchedPairs + 1 === 6) {
-                        setTimeout(() => setIsWon(true), 500)
-                    }
-                }, 600)
-            } else {
-                // No match
-                setTimeout(() => {
-                    setCards(prev =>
-                        prev.map(card =>
-                            card.id === first || card.id === second
-                                ? { ...card, isFlipped: false }
-                                : card
-                        )
-                    )
-                    setFlippedCards([])
-                }, 1000)
-            }
-        }
-    }, [flippedCards, cards, matchedPairs])
-
-    const resetGame = () => {
         const shuffled = CARD_IMAGES
             .map((emoji, index) => ({ id: index, emoji, isFlipped: false, isMatched: false }))
             .sort(() => Math.random() - 0.5)
@@ -95,6 +205,8 @@ export default function MemoryMatchPage() {
         setMatchedPairs(0)
         setMoves(0)
         setIsWon(false)
+        setIsChecking(false)
+        setHasDeductedTicket(false) // Reset ticket deduction flag for replay
     }
 
     return (

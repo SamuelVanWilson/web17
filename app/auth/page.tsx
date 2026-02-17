@@ -18,7 +18,7 @@ export default function AuthPage() {
 
         try {
             // For now, use a simple hardcoded passcode (will be replaced with Supabase)
-            const correctPasscode = 'ANNIVERSARY2025' // Change this to your secret code
+            const correctPasscode = '17022025' // Change this to your secret code
 
             if (passcode === correctPasscode) {
                 // Store auth token in localStorage
