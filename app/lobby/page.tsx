@@ -98,7 +98,7 @@ export default function LobbyPage() {
         >
             {/* Background Animations */}
             <div className="fixed inset-0 z-0 pointer-events-none">
-                <StarField scrollY={0} count={30} />
+                <StarField count={30} />
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-900/10 to-black/80" />
             </div>
 
