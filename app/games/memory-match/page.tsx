@@ -8,13 +8,23 @@ import { updateTickets, saveMemoryMatchScore, getGameProgress } from '@/lib/supa
 
 // Sample memory photos for cards (will be replaced with actual photos)
 const CARD_IMAGES = [
-    '💕', '🌹', '💝', '🎁', '🌟', '💖',
-    '💕', '🌹', '💝', '🎁', '🌟', '💖',
+    '/images/memory/1.svg',
+    '/images/memory/2.svg',
+    '/images/memory/3.svg',
+    '/images/memory/4.svg',
+    '/images/memory/5.svg',
+    '/images/memory/6.svg',
+    '/images/memory/1.svg',
+    '/images/memory/2.svg',
+    '/images/memory/3.svg',
+    '/images/memory/4.svg',
+    '/images/memory/5.svg',
+    '/images/memory/6.svg',
 ]
 
 interface Card {
     id: number
-    emoji: string
+    img: string
     isFlipped: boolean
     isMatched: boolean
 }
@@ -35,7 +45,7 @@ export default function MemoryMatchPage() {
     // Initialize cards
     useEffect(() => {
         const shuffled = CARD_IMAGES
-            .map((emoji, index) => ({ id: index, emoji, isFlipped: false, isMatched: false }))
+            .map((img, index) => ({ id: index, img, isFlipped: false, isMatched: false }))
             .sort(() => Math.random() - 0.5)
         setCards(shuffled)
     }, [])
@@ -142,11 +152,11 @@ export default function MemoryMatchPage() {
                     const firstCard = updatedCards.find(card => card.id === first)
                     const secondCard = updatedCards.find(card => card.id === second)
 
-                    if (firstCard && secondCard && firstCard.emoji === secondCard.emoji) {
+                    if (firstCard && secondCard && firstCard.img === secondCard.img) {
                         // Match found!
                         console.log('✅ Match found!', {
-                            firstCard: firstCard.emoji,
-                            secondCard: secondCard.emoji,
+                            firstCard: firstCard.img,
+                            secondCard: secondCard.img,
                             firstId: first,
                             secondId: second
                         })
@@ -198,7 +208,7 @@ export default function MemoryMatchPage() {
         }
 
         const shuffled = CARD_IMAGES
-            .map((emoji, index) => ({ id: index, emoji, isFlipped: false, isMatched: false }))
+            .map((img, index) => ({ id: index, img, isFlipped: false, isMatched: false }))
             .sort(() => Math.random() - 0.5)
         setCards(shuffled)
         setFlippedCards([])
@@ -210,113 +220,111 @@ export default function MemoryMatchPage() {
     }
 
     return (
-        <div className="min-h-screen p-4 md:p-8">
-            <div className="max-w-4xl mx-auto">
-                {/* Header */}
-                <div className="flex justify-between items-center mb-8">
+        <div className="h-[100dvh] w-full overflow-hidden bg-gradient-to-br from-indigo-50 to-purple-100 flex flex-col relative select-none">
+            <div className="w-full max-w-lg mx-auto h-full flex flex-col p-4">
+                {/* Header - Compact */}
+                <div className="flex justify-between items-center mb-2 shrink-0 z-20 relative">
                     <motion.button
                         onClick={() => router.push('/lobby')}
-                        className="text-primary-600 hover:text-primary-700 font-heading"
-                        whileHover={{ x: -5 }}
+                        className="bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-sm text-purple-600 hover:bg-white transition-colors"
+                        whileTap={{ scale: 0.95 }}
                     >
-                        ← Kembali ke Lobby
+                        <span className="sr-only">Back</span>
+                        ←
                     </motion.button>
 
-                    <div className="glass rounded-lg px-4 py-2">
-                        <span className="font-heading font-semibold">Moves: {moves}</span>
+                    <h1 className="text-xl font-bold text-purple-600 font-heading absolute left-1/2 -translate-x-1/2 hidden xs:block">
+                        Memory Match
+                    </h1>
+
+                    <div className="bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-purple-100 text-purple-600 text-sm font-bold">
+                        Moves: {moves}
                     </div>
                 </div>
 
-                {/* Title */}
-                <motion.div
-                    className="text-center mb-8"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                >
-                    <h1 className="text-4xl md:text-5xl font-heading font-bold gradient-text mb-2">
-                        🎴 The Memory Match
-                    </h1>
-                    <p className="text-gray-700 font-body">
-                        Cocokkan semua kartu kenangan kita!
-                    </p>
-                </motion.div>
-
-                {/* Game Grid */}
-                <div className="grid grid-cols-3 md:grid-cols-4 gap-4 mb-8">
-                    {cards.map((card, index) => (
-                        <motion.div
-                            key={card.id}
-                            className="aspect-square cursor-pointer"
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: index * 0.05 }}
-                            onClick={() => handleCardClick(card.id)}
-                        >
+                {/* Game Container - Fills remaining space */}
+                <div className="flex-1 w-full h-full min-h-0 flex flex-col justify-center items-center py-2">
+                    {/* Game Grid */}
+                    <div className="grid grid-cols-3 gap-3 w-full max-w-[340px] aspect-[3/4] content-center">
+                        {cards.map((card, index) => (
                             <motion.div
-                                className="w-full h-full relative"
-                                animate={{ rotateY: card.isFlipped || card.isMatched ? 180 : 0 }}
-                                transition={{ duration: 0.6 }}
-                                style={{ transformStyle: 'preserve-3d' }}
+                                key={card.id}
+                                className="aspect-[3/4] cursor-pointer"
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: index * 0.05 }}
+                                onClick={() => handleCardClick(card.id)}
                             >
-                                {/* Card Back */}
-                                <div
-                                    className="absolute inset-0 glass rounded-2xl flex items-center justify-center text-4xl"
-                                    style={{
-                                        backfaceVisibility: 'hidden',
-                                        transform: 'rotateY(0deg)'
-                                    }}
+                                <motion.div
+                                    className="w-full h-full relative shadow-sm rounded-xl"
+                                    animate={{ rotateY: card.isFlipped || card.isMatched ? 180 : 0 }}
+                                    transition={{ duration: 0.4 }}
+                                    style={{ transformStyle: 'preserve-3d' }}
                                 >
-                                    💝
-                                </div>
+                                    {/* Card Back */}
+                                    <div
+                                        className="absolute inset-0 bg-white/60 backdrop-blur-sm border-2 border-white/50 rounded-xl flex items-center justify-center text-3xl shadow-sm"
+                                        style={{
+                                            backfaceVisibility: 'hidden',
+                                            transform: 'rotateY(0deg)'
+                                        }}
+                                    >
+                                        💝
+                                    </div>
 
-                                {/* Card Front */}
-                                <div
-                                    className={`absolute inset-0 rounded-2xl flex items-center justify-center text-5xl ${card.isMatched ? 'bg-gradient-to-br from-green-200 to-green-300' : 'bg-gradient-to-br from-primary-200 to-secondary-200'
-                                        }`}
-                                    style={{
-                                        backfaceVisibility: 'hidden',
-                                        transform: 'rotateY(180deg)'
-                                    }}
-                                >
-                                    {card.emoji}
-                                </div>
+                                    {/* Card Front */}
+                                    <div
+                                        className={`absolute inset-0 rounded-xl flex items-center justify-center overflow-hidden shadow-inner border-2 border-white/20 ${card.isMatched
+                                            ? 'bg-gradient-to-br from-green-100 to-emerald-200'
+                                            : 'bg-white'
+                                            }`}
+                                        style={{
+                                            backfaceVisibility: 'hidden',
+                                            transform: 'rotateY(180deg)'
+                                        }}
+                                    >
+                                        <img
+                                            src={card.img}
+                                            alt="Memory"
+                                            className="w-full h-full object-cover"
+                                            draggable={false}
+                                        />
+                                    </div>
+                                </motion.div>
                             </motion.div>
-                        </motion.div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
 
                 {/* Win Modal */}
                 <AnimatePresence>
                     {isWon && (
                         <motion.div
-                            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                            className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px]"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setIsWon(false)}
                         >
                             <motion.div
-                                className="glass rounded-3xl p-8 max-w-md w-full text-center"
+                                className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 max-w-xs w-full text-center shadow-2xl border border-white/50"
                                 initial={{ scale: 0.8, y: 20 }}
                                 animate={{ scale: 1, y: 0 }}
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                <div className="text-6xl mb-4">🎉</div>
-                                <h2 className="text-3xl font-heading font-bold gradient-text mb-4">
-                                    Kamu Menang, Sayang!
+                                <div className="text-6xl mb-4 animate-bounce">🎉</div>
+                                <h2 className="text-2xl font-bold text-purple-600 mb-2">
+                                    Kamu Menang!
                                 </h2>
-                                <p className="text-gray-700 font-body mb-2">
-                                    Selamat! Kamu berhasil mencocokkan semua kenangan kita dengan {moves} moves!
-                                </p>
-                                <p className="text-primary-600 italic mb-6">
-                                    "Setiap kenangan bersama kamu adalah harta yang paling berharga" 💕
+                                <p className="text-purple-900/70 text-sm mb-6">
+                                    Hebat! Kamu menyelesaikan game ini dalam {moves} langkah! 💕
                                 </p>
 
                                 <div className="space-y-3">
-                                    <Button variant="primary" size="lg" onClick={resetGame} className="w-full">
-                                        Main Lagi
+                                    <Button variant="primary" size="lg" onClick={resetGame} className="w-full shadow-purple-200 shadow-lg">
+                                        Main Lagi ↺
                                     </Button>
-                                    <Button variant="secondary" size="md" onClick={() => router.push('/lobby')} className="w-full">
+                                    <Button variant="secondary" size="md" onClick={() => router.push('/lobby')} className="w-full bg-white/50">
                                         Kembali ke Lobby
                                     </Button>
                                 </div>

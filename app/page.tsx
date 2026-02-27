@@ -1,229 +1,296 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { getTimeSinceAnniversary } from '@/lib/utils/dates'
 import { ANNIVERSARY_DATE, MEMORY_TIMELINE } from '@/lib/constants/gameData'
 import Button from '@/components/ui/Button'
-import { ChevronDown } from 'lucide-react'
-
 import { FloatingBackground } from '@/components/ui/FloatingBackground'
-
+import { StarField } from '@/components/ui/StarField'
+import { ChevronDown, Volume2, VolumeX } from 'lucide-react'
 
 export default function HomePage() {
   const router = useRouter()
   const [timeElapsed, setTimeElapsed] = useState(getTimeSinceAnniversary(ANNIVERSARY_DATE))
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
+  const [hasInteracted, setHasInteracted] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
+  // Auth + timer
   useEffect(() => {
-    // Check authentication
     const auth = localStorage.getItem('memoryOdysseyAuth')
-    if (!auth) {
-      router.push('/auth')
-      return
-    }
+    if (!auth) { router.push('/auth'); return }
     setIsAuthenticated(true)
-
-    // Update timer every second
-    const interval = setInterval(() => {
-      setTimeElapsed(getTimeSinceAnniversary(ANNIVERSARY_DATE))
-    }, 1000)
-
+    const interval = setInterval(() => setTimeElapsed(getTimeSinceAnniversary(ANNIVERSARY_DATE)), 1000)
     return () => clearInterval(interval)
   }, [router])
+
+  // Music on first interaction
+  const tryPlayMusic = useCallback(() => {
+    if (!hasInteracted && audioRef.current) {
+      audioRef.current.volume = 0.4
+      audioRef.current.play().catch(() => { })
+      setHasInteracted(true)
+    }
+  }, [hasInteracted])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    el.addEventListener('click', tryPlayMusic, { once: true })
+    el.addEventListener('touchstart', tryPlayMusic, { once: true })
+    return () => {
+      el.removeEventListener('click', tryPlayMusic)
+      el.removeEventListener('touchstart', tryPlayMusic)
+    }
+  }, [tryPlayMusic, isAuthenticated])
+
+  const toggleMute = () => {
+    if (!audioRef.current) return
+    if (!hasInteracted) {
+      audioRef.current.volume = 0.4
+      audioRef.current.play().catch(() => { })
+      setHasInteracted(true)
+      setIsMuted(false)
+    } else {
+      const next = !isMuted
+      setIsMuted(next)
+      audioRef.current.muted = next
+    }
+  }
 
   if (!isAuthenticated) return null
 
   return (
     <div
       ref={containerRef}
-      className="h-screen w-full overflow-y-scroll snap-y snap-mandatory bg-orange-50 scroll-smooth font-sans text-gray-900"
+      className="h-screen w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth bg-black"
+      style={{ fontFamily: "'Raleway', sans-serif" }}
     >
+      <audio ref={audioRef} src="/audio/bgm.mp3" loop preload="none" />
 
-      {/* Hero Section */}
-      <section className="h-screen w-full snap-center relative flex flex-col items-center justify-center p-8 text-center overflow-hidden">
-        <FloatingBackground />
+      {/* Music toggle */}
+      <button
+        onClick={toggleMute}
+        className="fixed top-5 right-5 z-50 w-10 h-10 rounded-full flex items-center justify-center border border-white/20 hover:scale-110 active:scale-95 transition-all duration-200"
+        style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}
+      >
+        {isMuted || !hasInteracted
+          ? <VolumeX size={15} className="text-white/60" />
+          : <Volume2 size={15} className="text-yellow-200/80" />
+        }
+      </button>
+
+      {/* ── HERO ──────────────────────────────────────── */}
+      <section className="h-screen w-full snap-center relative flex flex-col items-center justify-center text-center overflow-hidden bg-black">
+        <StarField count={15} />
 
         <motion.div
-          className="z-10 relative w-full max-w-lg flex flex-col items-center gap-8"
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.2, ease: "easeOut" }}
-          viewport={{ once: false }}
+          className="z-10 relative flex flex-col items-center gap-6 px-8 w-full max-w-sm"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.1, ease: 'easeOut' }}
         >
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.8 }}
-            className="inline-block px-6 py-2 rounded-full bg-white/60 backdrop-blur-md border border-white/50 text-xs font-bold text-primary-500 shadow-sm tracking-[0.2em] uppercase"
+          <span
+            className="text-[10px] uppercase tracking-[0.25em] font-bold"
+            style={{ color: 'rgba(253,230,138,0.7)' }}
           >
-            The Memory Odyssey
-          </motion.div>
+            ✦ Memori Kenangan Muel & Revi
+          </span>
 
-          <motion.h1
-            initial={{ y: 20, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
-            className="text-5xl md:text-8xl font-heading font-bold text-transparent bg-clip-text bg-gradient-to-br from-pink-500 via-rose-500 to-purple-600 drop-shadow-sm leading-tight"
+          <h1
+            className="text-4xl font-bold leading-tight"
+            style={{
+              fontFamily: "'Quicksand', sans-serif",
+              background: 'linear-gradient(135deg, #fffbe6 0%, #fde68a 40%, #f59e0b 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
           >
-            Our Journey<br />Together
-          </motion.h1>
+            Perjalanan Kita Bersama
+          </h1>
 
-          <motion.p
-            initial={{ y: 20, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.7, duration: 0.8 }}
-            className="text-base md:text-xl text-gray-600 font-body max-w-xs md:max-w-md mx-auto leading-loose"
-          >
-            Setiap detik adalah cerita, setiap hari adalah kenangan.
-            <br />Selamat merayakan perjalanan hebat ini.
-          </motion.p>
+          <p className="text-sm leading-loose" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            Setiap detik adalah cerita,<br />setiap hari adalah kenangan.
+          </p>
 
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.9, duration: 0.8 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <button
+            onClick={() => document.getElementById('memory-0')?.scrollIntoView({ behavior: 'smooth' })}
+            className="mt-2 px-12 py-3 rounded-full text-sm font-semibold transition-all duration-300 hover:scale-105 active:scale-95"
+            style={{
+              fontFamily: "'Quicksand', sans-serif",
+              background: 'linear-gradient(135deg, #78350f, #b45309, #d97706)',
+              color: '#fde68a',
+              border: '1px solid rgba(253,230,138,0.35)',
+              boxShadow: '0 0 20px rgba(217,119,6,0.35), inset 0 1px 0 rgba(255,255,255,0.08)',
+              letterSpacing: '0.05em',
+              padding: '12px 24px',
+            }}
           >
-            <Button
-              onClick={() => {
-                const nextSection = document.getElementById('memory-0')
-                nextSection?.scrollIntoView({ behavior: 'smooth' })
-              }}
-            >
-              Mulai Perjalanan 👇
-            </Button>
-          </motion.div>
+            Mulai Perjalanan ✨
+          </button>
         </motion.div>
 
-        {/* Scroll Indicator */}
         <motion.div
-          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10 text-gray-400/60"
-          animate={{ y: [0, 12, 0] }}
-          transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1"
+          animate={{ y: [0, 8, 0] }}
+          transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
         >
-          <ChevronDown size={28} />
+          <ChevronDown size={18} style={{ color: 'rgba(255,255,255,0.25)' }} />
         </motion.div>
       </section>
 
-      {/* Memory Timeline Sections */}
-      {MEMORY_TIMELINE.map((memory, index) => (
-        <section
-          id={`memory-${index}`}
-          key={memory.month}
-          className="h-screen w-full snap-center relative flex flex-col items-center justify-center p-6 overflow-hidden"
-        >
-          {/* Subtle gradient overlay for depth */}
-          <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-white/40 pointer-events-none" />
-
-          <motion.div
-            className="z-10 w-[90vw] max-w-md"
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: false, margin: "-20%" }}
-            transition={{ type: "spring", stiffness: 40, damping: 20, duration: 0.8 }}
+      {/* ── MEMORY SECTIONS ───────────────────────────── */}
+      {MEMORY_TIMELINE.map((memory, index) => {
+        return (
+          <section
+            id={`memory-${index}`}
+            key={memory.month}
+            className="h-screen w-full snap-center relative flex flex-col items-center justify-center p-6 overflow-hidden bg-black"
           >
-            {/* Polaroid Card */}
-            <div className="bg-white p-6 pb-8 md:p-8 md:pb-12 shadow-xl rounded-sm transform transition-all duration-700 hover:shadow-2xl border border-gray-100">
-              {/* Image Placeholder */}
-              <div className="aspect-[4/5] bg-gray-50 mb-8 relative overflow-hidden group w-full shadow-inner rounded-sm">
-                <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-300">
-                  <motion.span
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    whileInView={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="text-5xl md:text-6xl mb-4"
+            <StarField count={12} />
+
+            <motion.div
+              className="z-10 w-full max-w-sm"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false, margin: '-15%' }}
+              transition={{ type: 'spring', stiffness: 38, damping: 18 }}
+            >
+              {/* Card */}
+              <div
+                className="rounded-xl overflow-hidden border"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  borderColor: 'rgba(255,255,255,0.08)',
+                  boxShadow: '0 4px 32px rgba(0,0,0,0.8)',
+                }}
+              >
+                {/* Video */}
+                <div className="aspect-[4/5] relative bg-black">
+                  <video
+                    autoPlay loop muted playsInline
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none' }}
                   >
-                    📸
-                  </motion.span>
-                  <span className="text-xs font-medium uppercase tracking-[0.2em] opacity-40">Memory {index + 1}</span>
+                    <source src={`/video/bulan-${memory.month}.mp4`} type="video/mp4" />
+                  </video>
+
+                  {/* Fallback */}
+                  <div className="absolute inset-0 -z-10 flex flex-col items-center justify-center gap-2">
+                    <span className="text-4xl opacity-30">📸</span>
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.15)' }}>
+                      Bulan {memory.month}
+                    </span>
+                  </div>
+
+                  {/* Month badge */}
+                  <span
+                    className="absolute top-3 right-3 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest"
+                    style={{
+                      background: 'rgba(0,0,0,0.5)',
+                      border: '1px solid rgba(253,230,138,0.3)',
+                      color: '#fde68a',
+                      backdropFilter: 'blur(6px)',
+                    }}
+                  >
+                    Bulan {memory.month}
+                  </span>
                 </div>
 
-                {/* Month Badge - Cleaner look */}
-                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full shadow-sm border border-white/60">
-                  <span className="font-bold text-sm text-primary-500 uppercase tracking-widest">Bulan {memory.month}</span>
+                {/* Text */}
+                <div className="p-4 flex flex-col gap-2 text-center">
+                  <h3
+                    className="text-lg font-bold"
+                    style={{ fontFamily: "'Quicksand', sans-serif", color: '#f3f4f6' }}
+                  >
+                    {memory.title}
+                  </h3>
+                  <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    {memory.description}
+                  </p>
                 </div>
               </div>
+            </motion.div>
 
-              {/* Text Content */}
-              <div className="text-center px-2 flex flex-col gap-4">
-                <motion.h3
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                  className="font-heading text-2xl md:text-3xl font-bold text-gray-800"
-                >
-                  {memory.title}
-                </motion.h3>
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  transition={{ delay: 0.6 }}
-                  className="font-body text-gray-500 text-sm md:text-base leading-loose"
-                >
-                  {memory.description}
-                </motion.p>
-              </div>
+            {/* Progress dots */}
+            <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+              {MEMORY_TIMELINE.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => document.getElementById(`memory-${i}`)?.scrollIntoView({ behavior: 'smooth' })}
+                  style={{
+                    width: i === index ? 18 : 5,
+                    height: 5,
+                    borderRadius: 999,
+                    background: i === index ? '#fde68a' : 'rgba(255,255,255,0.18)',
+                    boxShadow: i === index ? '0 0 8px rgba(253,230,138,0.6)' : 'none',
+                    transition: 'all 0.3s',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                />
+              ))}
             </div>
-          </motion.div>
-        </section>
-      ))}
+          </section>
+        )
+      })}
 
-      {/* Timer Section - The Finale */}
-      <section className="h-screen w-full snap-center relative flex flex-col items-center justify-center p-8 text-center overflow-hidden bg-gradient-to-b from-orange-50/50 to-pink-50/50">
+      {/* ── TIMER / LOBBY ─────────────────────────────── */}
+      <section
+        className="h-screen w-full snap-center relative flex flex-col items-center justify-center p-8 text-center overflow-hidden"
+        style={{ background: 'linear-gradient(160deg, #0e0008 0%, #1a0010 50%, #100015 100%)' }}
+      >
         <FloatingBackground />
 
         <motion.div
-          className="z-10 w-full max-w-lg flex flex-col items-center gap-12"
+          className="z-10 w-full max-w-sm flex flex-col items-center gap-10"
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: false }}
-          transition={{ duration: 1 }}
+          transition={{ duration: 0.9 }}
         >
           <div>
-            <h3 className="text-sm font-bold text-primary-400 mb-12 uppercase tracking-[0.3em]">
-              Kita Bersama Selama
-            </h3>
-
-            <div className="grid grid-cols-2 gap-x-12 gap-y-10">
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-8" style={{ color: 'rgba(244,114,182,0.7)' }}>
+              ✨ Kita Bersama Selama
+            </p>
+            <div className="grid grid-cols-2 gap-x-10 gap-y-7">
               {[
                 { label: 'Hari', value: timeElapsed.days },
                 { label: 'Jam', value: timeElapsed.hours },
                 { label: 'Menit', value: timeElapsed.minutes },
-                { label: 'Detik', value: timeElapsed.seconds }
-              ].map((item, i) => (
+                { label: 'Detik', value: timeElapsed.seconds },
+              ].map((item) => (
                 <div key={item.label} className="flex flex-col items-center">
-                  <span className="text-5xl md:text-7xl font-bold text-primary-600 font-heading tracking-tight leading-none">
+                  <span
+                    className="text-5xl font-bold leading-none"
+                    style={{ fontFamily: "'Quicksand', sans-serif", color: '#f9a8d4' }}
+                  >
                     {item.value}
                   </span>
-                  <span className="text-[10px] md:text-xs text-gray-400 font-bold uppercase tracking-[0.3em] mt-2">{item.label}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest mt-1" style={{ color: 'rgba(249,168,212,0.45)' }}>
+                    {item.label}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
 
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="flex flex-col items-center gap-6"
-          >
-            <p className="text-gray-500 italic text-sm font-medium">
+          <div className="flex flex-col items-center gap-4">
+            <p className="italic text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
               "Dan perjalanan ini baru saja dimulai..."
             </p>
-            <Button
-              onClick={() => router.push('/lobby')}
-            >
-              Masuk ke Lobby ✨
+            <Button onClick={() => router.push('/lobby')}>
+              Masuk ke Lobby 🎮
             </Button>
-          </motion.div>
+          </div>
         </motion.div>
       </section>
-
     </div>
   )
 }

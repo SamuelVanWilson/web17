@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import Button from '@/components/ui/Button'
 import { SCRATCH_OFF_MESSAGES } from '@/lib/constants/gameData'
-import { getScratchHistory, saveScratchHistory, getGameProgress } from '@/lib/supabase/helpers'
+import { getScratchHistory, saveScratchHistory } from '@/lib/supabase/helpers'
 
 export default function ScratchOffPage() {
     const router = useRouter()
@@ -13,6 +13,7 @@ export default function ScratchOffPage() {
     const [isScratching, setIsScratching] = useState(false)
     const [scratchPercentage, setScratchPercentage] = useState(0)
     const [isRevealed, setIsRevealed] = useState(false)
+    const isRevealedRef = useRef(false)
     const [currentDay, setCurrentDay] = useState(1)
     const [hasScratched, setHasScratched] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
@@ -22,19 +23,39 @@ export default function ScratchOffPage() {
     useEffect(() => {
         async function loadScratchData() {
             try {
-                // Get game progress to determine first login date
-                const progress = await getGameProgress()
-
-                // Calculate current day based on calendar dates
                 const today = new Date().toISOString().split('T')[0]
-                const firstLoginDate = progress.last_login_date || today
 
-                // Calculate days elapsed since first login (1-indexed)
+                // Ambil scratch history — sumber kebenaran untuk menentukan hari ke-berapa
+                const history = await getScratchHistory()
+
+                let firstLoginDate: string
+                const FIRST_LOGIN_KEY = 'memoryOdysseyFirstLogin'
+
+                if (history.length > 0) {
+                    // Sudah pernah scratch → tanggal scratch hari ke-1 = hari pertama
+                    const firstScratch = history.find(h => h.day === 1) || history[0]
+                    firstLoginDate = firstScratch.scratched_at as string
+                    // Selalu update localStorage dari history (override nilai lama yang mungkin salah)
+                    localStorage.setItem(FIRST_LOGIN_KEY, firstLoginDate)
+                } else {
+                    // Belum pernah scratch → cek localStorage
+                    const stored = localStorage.getItem(FIRST_LOGIN_KEY)
+                    if (stored) {
+                        firstLoginDate = stored
+                    } else {
+                        // Total fresh → hari ini = hari ke-1
+                        firstLoginDate = today
+                        localStorage.setItem(FIRST_LOGIN_KEY, today)
+                    }
+                }
+
+                // Hitung hari ke-berapa sekarang (1-indexed)
                 const firstDate = new Date(firstLoginDate)
                 const currentDate = new Date(today)
-                const daysElapsed = Math.floor((currentDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                const daysElapsed =
+                    Math.floor((currentDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
 
-                // Cap at 7 days
+                // Cap di 7 hari
                 const day = Math.min(Math.max(1, daysElapsed), 7)
 
                 console.log('📅 Daily Surprise Date Calculation:', {
@@ -42,13 +63,12 @@ export default function ScratchOffPage() {
                     today,
                     daysElapsed,
                     currentDay: day,
-                    cappedAt7: daysElapsed > 7
+                    historyCount: history.length,
                 })
 
                 setCurrentDay(day)
 
-                // Check if user has scratched TODAY (not just this day number)
-                const history = await getScratchHistory()
+                // Cek apakah sudah scratch HARI INI
                 const scratchedToday = history.some(h => h.scratched_at === today)
 
                 console.log('🔍 Scratch History Check:', {
@@ -61,6 +81,7 @@ export default function ScratchOffPage() {
                     console.log('✅ Already scratched today! Showing completed state.')
                     setHasScratched(true)
                     setIsRevealed(true)
+                    isRevealedRef.current = true
                     setScratchPercentage(100)
                 } else {
                     console.log('🎁 New scratch card available for today!')
@@ -148,11 +169,12 @@ export default function ScratchOffPage() {
         const percentage = (transparent / (pixels.length / 4)) * 100
         setScratchPercentage(percentage)
 
-        if (percentage > 70 && !isRevealed) {
+        if (percentage > 50 && !isRevealedRef.current) {
+            isRevealedRef.current = true
             setIsRevealed(true)
-            // Save to database instead of localStorage
+            // Save to database
             saveScratchHistory(currentDay).catch(error => {
-                console.error('Failed to save scratch history:', error)
+                console.warn('Failed to save scratch history (non-critical):', error)
             })
         }
     }
@@ -173,138 +195,148 @@ export default function ScratchOffPage() {
     }
 
     return (
-        <div className="min-h-screen p-4 md:p-8">
+        <div className="h-[100dvh] w-full overflow-hidden bg-gradient-to-br from-pink-50 to-purple-100 flex flex-col relative select-none touch-action-none">
             {isLoading ? (
-                <div className="flex items-center justify-center min-h-[400px]">
+                <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
-                        <div className="text-4xl mb-4 animate-pulse">🎁</div>
-                        <p className="text-gray-600 font-body">Loading...</p>
+                        <div className="text-6xl mb-4 animate-bounce">🎁</div>
+                        <p className="text-purple-600 font-bold animate-pulse">Memuat kejutan...</p>
                     </div>
                 </div>
             ) : (
-                <div className="max-w-3xl mx-auto">
-                    {/* Header */}
-                    <div className="flex justify-between items-center mb-8">
+                <div className="w-full max-w-lg mx-auto h-full flex flex-col p-4">
+                    {/* Header - Compact */}
+                    <div className="flex justify-between items-center mb-6 shrink-0 z-20 relative">
                         <motion.button
                             onClick={() => router.push('/lobby')}
-                            className="text-primary-600 hover:text-primary-700 font-heading"
-                            whileHover={{ x: -5 }}
+                            className="bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-sm text-purple-600 hover:bg-white transition-colors"
+                            whileTap={{ scale: 0.95 }}
                         >
-                            ← Kembali ke Lobby
+                            <span className="sr-only">Back</span>
+                            ←
                         </motion.button>
 
-                        <div className="glass rounded-lg px-4 py-2">
-                            <span className="font-heading font-semibold">Hari {currentDay} / 7</span>
+                        <div className="bg-white/80 backdrop-blur-sm px-4 py-1.5 rounded-full shadow-sm border border-purple-100 text-purple-600 text-sm font-bold">
+                            Hari {currentDay} / 7
                         </div>
                     </div>
 
-                    {/* Title */}
-                    <motion.div
-                        className="text-center mb-8"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                    >
-                        <h1 className="text-4xl md:text-5xl font-heading font-bold gradient-text mb-2">
-                            🎁 Daily Surprise
-                        </h1>
-                        <p className="text-gray-700 font-body">
-                            Gosok kartu untuk melihat kejutan hari ini!
-                        </p>
-                    </motion.div>
-
-                    {hasScratched && !isRevealed ? (
-                        /* Already Scratched Today */
+                    {/* Content Container */}
+                    <div className="flex-1 flex flex-col justify-center items-center relative w-full">
+                        {/* Title */}
                         <motion.div
-                            className="glass rounded-3xl p-8 text-center"
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
+                            className="text-center mb-8 absolute top-0 w-full"
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
                         >
-                            <div className="text-6xl mb-4">⏰</div>
-                            <h2 className="text-3xl font-heading font-bold gradient-text mb-4">
-                                Sudah Dibuka Hari Ini!
-                            </h2>
-                            <p className="text-gray-700 font-body mb-6">
-                                Kembali besok untuk membuka kejutan berikutnya, sayang! 💕
+                            <h1 className="text-2xl font-bold text-purple-600 font-heading mb-1">
+                                Daily Surprise 🎁
+                            </h1>
+                            <p className="text-purple-900/60 text-xs">
+                                Gosok kartunya pelan-pelan ya!
                             </p>
-                            <Button variant="primary" size="lg" onClick={() => router.push('/lobby')}>
-                                Kembali ke Lobby
-                            </Button>
                         </motion.div>
-                    ) : (
-                        /* Scratch Card */
-                        <div className="glass rounded-3xl p-8">
-                            <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-gradient-to-br from-primary-100 to-secondary-100">
-                                {/* Hidden content */}
-                                <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-                                    <div className="text-6xl mb-4">{message.title === 'Hari Pertama' ? '💕' : '🎉'}</div>
-                                    <h2 className="text-3xl font-heading font-bold text-primary-600 mb-4">
-                                        {message.title}
-                                    </h2>
-                                    <p className="text-xl text-gray-700 font-body max-w-md">
-                                        {message.message}
-                                    </p>
 
-                                    {/* Placeholder image */}
-                                    <div className="mt-6 w-48 h-48 rounded-xl bg-white/50 flex items-center justify-center">
-                                        <span className="text-4xl">📷</span>
-                                    </div>
-                                </div>
-
-                                {/* Scratch canvas overlay */}
-                                {!isRevealed && (
-                                    <canvas
-                                        ref={canvasRef}
-                                        className="absolute inset-0 w-full h-full cursor-pointer"
-                                        onMouseDown={handleMouseDown}
-                                        onMouseUp={handleMouseUp}
-                                        onMouseMove={handleMouseMove}
-                                        onMouseLeave={handleMouseUp}
-                                        onTouchStart={handleMouseDown}
-                                        onTouchEnd={handleMouseUp}
-                                        onTouchMove={handleTouchMove}
-                                    />
-                                )}
-                            </div>
-
-                            {/* Progress */}
-                            {scratchPercentage > 0 && scratchPercentage < 70 && (
+                        {hasScratched && !isRevealed ? (
+                            /* Already Scratched Today */
+                            <motion.div
+                                className="bg-white/80 backdrop-blur-md rounded-3xl p-8 text-center shadow-xl border border-white/50 w-full"
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                            >
+                                <div className="text-6xl mb-4">⏰</div>
+                                <h2 className="text-2xl font-bold text-purple-600 mb-2">
+                                    Sudah Dibuka!
+                                </h2>
+                                <p className="text-gray-600 text-sm mb-6 leading-relaxed">
+                                    Kamu sudah buka kejutan hari ini.<br />Besok balik lagi ya sayang! 💕
+                                </p>
+                                <Button variant="primary" size="lg" onClick={() => router.push('/lobby')} className="w-full shadow-lg shadow-purple-200">
+                                    Kembali ke Lobby
+                                </Button>
+                            </motion.div>
+                        ) : (
+                            /* Scratch Card Area */
+                            <div className="w-full flex-1 flex flex-col justify-center items-center py-8">
                                 <motion.div
-                                    className="mt-4 text-center"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
+                                    className="bg-white p-2 rounded-3xl shadow-2xl shadow-purple-200/50 w-full max-w-sm aspect-[4/5] relative"
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
                                 >
-                                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <motion.div
-                                            className="h-full bg-gradient-to-r from-primary-400 to-secondary-500"
-                                            initial={{ width: 0 }}
-                                            animate={{ width: `${scratchPercentage}%` }}
-                                        />
-                                    </div>
-                                    <p className="text-sm text-gray-600 mt-2 font-body">
-                                        {Math.round(scratchPercentage)}% tergosok
-                                    </p>
-                                </motion.div>
-                            )}
+                                    <div className="relative w-full h-full rounded-2xl overflow-hidden bg-gradient-to-br from-pink-50 to-purple-50 border border-purple-100">
+                                        {/* Hidden content */}
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center select-none">
+                                            <div className="text-6xl mb-4 animate-bounce">
+                                                {message.title === 'Hari Pertama' ? '💕' : '🎉'}
+                                            </div>
+                                            <h2 className="text-2xl font-bold text-purple-600 mb-3 font-heading">
+                                                {message.title}
+                                            </h2>
+                                            <p className="text-gray-700 text-sm leading-relaxed max-w-xs font-medium">
+                                                {message.message}
+                                            </p>
 
-                            {/* Revealed Message */}
-                            <AnimatePresence>
-                                {isRevealed && (
-                                    <motion.div
-                                        className="mt-6 text-center"
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                    >
-                                        <p className="text-green-600 font-heading font-semibold mb-4">
-                                            ✨ Kejutan terbuka! ✨
-                                        </p>
-                                        <Button variant="primary" size="lg" onClick={() => router.push('/lobby')}>
-                                            Kembali ke Lobby
-                                        </Button>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    )}
+                                            {/* Photo Placeholder */}
+                                            <div className="mt-6 w-full max-w-[200px] aspect-square rounded-xl bg-purple-100/50 border-2 border-dashed border-purple-200 flex items-center justify-center text-purple-300">
+                                                <span className="text-4xl">📷</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Scratch canvas overlay */}
+                                        {!isRevealed && (
+                                            <canvas
+                                                ref={canvasRef}
+                                                className="absolute inset-0 w-full h-full touch-none cursor-crosshair active:cursor-grabbing"
+                                                onMouseDown={handleMouseDown}
+                                                onMouseUp={handleMouseUp}
+                                                onMouseMove={handleMouseMove}
+                                                onMouseLeave={handleMouseUp}
+                                                onTouchStart={handleMouseDown}
+                                                onTouchEnd={handleMouseUp}
+                                                onTouchMove={handleTouchMove}
+                                            />
+                                        )}
+                                    </div>
+                                </motion.div>
+
+                                {/* Progress Indicator */}
+                                <div className="h-12 w-full mt-6 flex items-center justify-center">
+                                    <AnimatePresence>
+                                        {scratchPercentage > 0 && scratchPercentage < 70 && !isRevealed && (
+                                            <motion.div
+                                                className="w-full max-w-xs text-center"
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0 }}
+                                            >
+                                                <div className="h-2 bg-white/50 rounded-full overflow-hidden backdrop-blur-sm mx-auto w-48">
+                                                    <motion.div
+                                                        className="h-full bg-gradient-to-r from-pink-500 to-purple-500"
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${scratchPercentage}%` }}
+                                                    />
+                                                </div>
+                                                <p className="text-xs text-purple-600 mt-2 font-bold">
+                                                    {Math.round(scratchPercentage)}% Terbuka
+                                                </p>
+                                            </motion.div>
+                                        )}
+                                        {isRevealed && (
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.8 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                className="w-full"
+                                            >
+                                                <Button variant="primary" size="lg" onClick={() => router.push('/lobby')} className="w-full max-w-xs shadow-xl shadow-purple-200 animate-pulse">
+                                                    Simpan &amp; Kembali ✨
+                                                </Button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

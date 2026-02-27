@@ -18,7 +18,7 @@ export default function QuizPage() {
     const [hasDeductedTicket, setHasDeductedTicket] = useState(false)
     const [currentTickets, setCurrentTickets] = useState<number | null>(null)
 
-    const question = QUIZ_QUESTIONS[currentQuestion]
+    const question = QUIZ_QUESTIONS[currentQuestion] ?? QUIZ_QUESTIONS[0]
 
     // Deduct ticket when game starts
     useEffect(() => {
@@ -122,139 +122,155 @@ export default function QuizPage() {
     }
 
     return (
-        <div className="min-h-screen p-4 md:p-8">
-            <div className="max-w-3xl mx-auto">
-                {/* Header */}
-                <div className="flex justify-between items-center mb-8">
+        <div className="h-[100dvh] w-full overflow-hidden bg-gradient-to-br from-indigo-50 to-purple-100 flex flex-col relative select-none">
+            <div className="w-full max-w-lg mx-auto h-full flex flex-col p-4">
+                {/* Header - Compact */}
+                <div className="flex justify-between items-center mb-4 shrink-0 z-20 relative">
                     <motion.button
                         onClick={() => router.push('/lobby')}
-                        className="text-primary-600 hover:text-primary-700 font-heading"
-                        whileHover={{ x: -5 }}
+                        className="bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-sm text-purple-600 hover:bg-white transition-colors"
+                        whileTap={{ scale: 0.95 }}
                     >
-                        ← Kembali ke Lobby
+                        <span className="sr-only">Back</span>
+                        ←
                     </motion.button>
 
                     {!showResult && (
-                        <div className="glass rounded-lg px-4 py-2">
-                            <span className="font-heading font-semibold">
-                                {currentQuestion + 1} / {QUIZ_QUESTIONS.length}
-                            </span>
+                        <div className="bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-purple-100 text-purple-600 text-sm font-bold">
+                            {currentQuestion + 1} / {QUIZ_QUESTIONS.length}
                         </div>
                     )}
                 </div>
 
-                {/* Title */}
-                <motion.div
-                    className="text-center mb-8"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                >
-                    <h1 className="text-4xl md:text-5xl font-heading font-bold gradient-text mb-2">
-                        ❓ How Well Do You Remember?
-                    </h1>
-                    <p className="text-gray-700 font-body">
-                        Seberapa inget kamu tentang kita?
-                    </p>
-                </motion.div>
-
-                {!showResult ? (
-                    <div className="space-y-6">
-                        {/* Question Card */}
-                        <motion.div
-                            key={currentQuestion}
-                            className="glass rounded-3xl p-8"
-                            initial={{ opacity: 0, x: 50 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -50 }}
-                        >
-                            <h2 className="text-2xl font-heading font-bold text-gray-800 mb-6 text-center">
-                                {question.question}
-                            </h2>
-
-                            <div className="space-y-3">
-                                {question.options.map((option, index) => (
-                                    <motion.button
-                                        key={index}
-                                        onClick={() => handleAnswerClick(index)}
-                                        className={`w-full p-4 rounded-xl text-left font-body transition-all ${selectedAnswer === null
-                                            ? 'bg-white hover:bg-primary-50 border-2 border-gray-200 hover:border-primary-300'
-                                            : selectedAnswer === index
-                                                ? index === question.correctAnswer
-                                                    ? 'bg-green-100 border-2 border-green-500'
-                                                    : 'bg-red-100 border-2 border-red-500'
-                                                : index === question.correctAnswer
-                                                    ? 'bg-green-100 border-2 border-green-500'
-                                                    : 'bg-gray-100 border-2 border-gray-300'
-                                            }`}
-                                        disabled={selectedAnswer !== null}
-                                        whileHover={selectedAnswer === null ? { scale: 1.02 } : {}}
-                                        whileTap={selectedAnswer === null ? { scale: 0.98 } : {}}
-                                    >
-                                        {option}
-                                    </motion.button>
-                                ))}
-                            </div>
-
-                            {/* Sweet Message */}
-                            <AnimatePresence>
-                                {showMessage && (
-                                    <motion.div
-                                        className="mt-6 p-4 bg-primary-50 rounded-xl"
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0 }}
-                                    >
-                                        <p className="text-primary-700 text-center font-body italic">
-                                            {question.sweetMessage}
-                                        </p>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </motion.div>
-
-                        {/* Next Button */}
-                        {selectedAnswer !== null && (
+                {/* Content Container - Scrollable if needed but centered by default */}
+                <div className="flex-1 w-full h-full min-h-0 flex flex-col relative overflow-y-auto no-scrollbar">
+                    <div className="flex-1 flex flex-col justify-center py-4">
+                        {/* Title (Only show if not result) */}
+                        {!showResult && (
                             <motion.div
-                                className="text-center"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
+                                className="text-center mb-6 shrink-0"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
                             >
-                                <Button variant="primary" size="lg" onClick={handleNext} disabled={isSaving}>
-                                    {isSaving ? 'Menyimpan...' : currentQuestion < QUIZ_QUESTIONS.length - 1 ? 'Lanjut →' : 'Lihat Hasil 🎉'}
-                                </Button>
+                                <h1 className="text-2xl font-bold text-purple-600 font-heading">
+                                    Our Quiz ❓
+                                </h1>
+                            </motion.div>
+                        )}
+
+                        {!showResult ? (
+                            <div className="w-full relative">
+                                <AnimatePresence mode='wait'>
+                                    <motion.div
+                                        key={currentQuestion}
+                                        className="bg-white/60 backdrop-blur-md rounded-3xl p-6 shadow-xl border border-white/50 w-full"
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -20 }}
+                                        transition={{ duration: 0.3 }}
+                                    >
+                                        <h2 className="text-xl font-bold text-gray-800 mb-6 text-center leading-relaxed">
+                                            {question.question}
+                                        </h2>
+
+                                        <div className="space-y-3">
+                                            {question.options.map((option, index) => (
+                                                <motion.button
+                                                    key={index}
+                                                    onClick={() => handleAnswerClick(index)}
+                                                    className={`w-full p-4 rounded-xl text-left text-sm font-medium transition-all relative overflow-hidden ${selectedAnswer === null
+                                                        ? 'bg-white/80 hover:bg-white border-2 border-transparent hover:border-purple-200 shadow-sm'
+                                                        : selectedAnswer === index
+                                                            ? index === question.correctAnswer
+                                                                ? 'bg-green-100 border-2 border-green-500 text-green-800'
+                                                                : 'bg-red-100 border-2 border-red-500 text-red-800'
+                                                            : index === question.correctAnswer
+                                                                ? 'bg-green-100 border-2 border-green-500 text-green-800'
+                                                                : 'bg-white/50 border-2 border-transparent opacity-50'
+                                                        }`}
+                                                    disabled={selectedAnswer !== null}
+                                                    whileTap={selectedAnswer === null ? { scale: 0.98 } : {}}
+                                                >
+                                                    {option}
+                                                    {selectedAnswer !== null && index === question.correctAnswer && (
+                                                        <span className="absolute right-4 top-1/2 -translate-y-1/2">✅</span>
+                                                    )}
+                                                    {selectedAnswer === index && index !== question.correctAnswer && (
+                                                        <span className="absolute right-4 top-1/2 -translate-y-1/2">❌</span>
+                                                    )}
+                                                </motion.button>
+                                            ))}
+                                        </div>
+
+                                        {/* Sweet Message */}
+                                        <AnimatePresence>
+                                            {showMessage && (
+                                                <motion.div
+                                                    className="mt-6 p-4 bg-purple-50 rounded-xl border border-purple-100"
+                                                    initial={{ opacity: 0, height: 0 }}
+                                                    animate={{ opacity: 1, height: 'auto' }}
+                                                    exit={{ opacity: 0, height: 0 }}
+                                                >
+                                                    <p className="text-purple-700 text-center text-sm italic">
+                                                        "{question.sweetMessage}"
+                                                    </p>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </motion.div>
+                                </AnimatePresence>
+
+                                {/* Next Button */}
+                                <div className="mt-6 h-12">
+                                    <AnimatePresence>
+                                        {selectedAnswer !== null && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: 10 }}
+                                            >
+                                                <Button variant="primary" size="lg" onClick={handleNext} disabled={isSaving} className="w-full shadow-lg shadow-purple-200">
+                                                    {isSaving ? 'Menyimpan...' : currentQuestion < QUIZ_QUESTIONS.length - 1 ? 'Lanjut →' : 'Lihat Hasil 🎉'}
+                                                </Button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Results Screen */
+                            <motion.div
+                                className="bg-white/80 backdrop-blur-md rounded-3xl p-8 text-center shadow-xl border border-white/50 m-4"
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                            >
+                                <div className="text-7xl mb-4 animate-bounce bg-white w-24 h-24 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                                    {getScoreMessage().emoji}
+                                </div>
+                                <h2 className="text-2xl font-bold text-purple-600 mb-2">
+                                    {getScoreMessage().title}
+                                </h2>
+
+                                <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500 mb-2 py-2">
+                                    {score} / {QUIZ_QUESTIONS.length}
+                                </div>
+
+                                <p className="text-gray-600 text-sm mb-8 leading-relaxed">
+                                    {getScoreMessage().message}
+                                </p>
+
+                                <div className="space-y-3">
+                                    <Button variant="primary" size="lg" onClick={resetQuiz} className="w-full shadow-lg shadow-purple-200">
+                                        Main Lagi ↺
+                                    </Button>
+                                    <Button variant="secondary" size="md" onClick={() => router.push('/lobby')} className="w-full bg-white/50">
+                                        Kembali ke Lobby
+                                    </Button>
+                                </div>
                             </motion.div>
                         )}
                     </div>
-                ) : (
-                    /* Results Screen */
-                    <motion.div
-                        className="glass rounded-3xl p-8 text-center"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                    >
-                        <div className="text-7xl mb-4">{getScoreMessage().emoji}</div>
-                        <h2 className="text-4xl font-heading font-bold gradient-text mb-4">
-                            {getScoreMessage().title}
-                        </h2>
-
-                        <div className="text-6xl font-bold text-primary-500 mb-2">
-                            {score} / {QUIZ_QUESTIONS.length}
-                        </div>
-
-                        <p className="text-gray-700 font-body mb-6">
-                            {getScoreMessage().message}
-                        </p>
-
-                        <div className="space-y-3">
-                            <Button variant="primary" size="lg" onClick={resetQuiz} className="w-full">
-                                Main Lagi
-                            </Button>
-                            <Button variant="secondary" size="md" onClick={() => router.push('/lobby')} className="w-full">
-                                Kembali ke Lobby
-                            </Button>
-                        </div>
-                    </motion.div>
-                )}
+                </div>
             </div>
         </div>
     )

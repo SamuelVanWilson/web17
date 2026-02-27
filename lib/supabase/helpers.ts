@@ -3,17 +3,36 @@ import { supabase } from './client'
 // ==================== SESSION MANAGEMENT ====================
 
 /**
+ * List of all localStorage keys used by the app
+ */
+const LS_SESSION_ID = 'memoryOdysseySessionId'
+const LS_FIRST_LOGIN = 'memoryOdysseyFirstLogin'
+const LS_PROGRESS = 'memoryOdysseyProgress'
+
+/**
+ * Clear all localStorage keys and return a fresh session ID
+ */
+function clearAndCreateFreshSession(): string {
+    localStorage.removeItem(LS_SESSION_ID)
+    localStorage.removeItem(LS_FIRST_LOGIN)
+    localStorage.removeItem(LS_PROGRESS)
+    const newId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    localStorage.setItem(LS_SESSION_ID, newId)
+    console.log('🔄 Fresh session created:', newId)
+    return newId
+}
+
+/**
  * Get or create a unique session ID for the user
  * Stores session ID in localStorage for persistence across page loads
  */
 export function getOrCreateSessionId(): string {
-    const storageKey = 'memoryOdysseySessionId'
-    let sessionId = localStorage.getItem(storageKey)
+    let sessionId = localStorage.getItem(LS_SESSION_ID)
 
     if (!sessionId) {
         // Generate unique session ID using timestamp + random string
         sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-        localStorage.setItem(storageKey, sessionId)
+        localStorage.setItem(LS_SESSION_ID, sessionId)
     }
 
     return sessionId
@@ -21,7 +40,8 @@ export function getOrCreateSessionId(): string {
 
 /**
  * Initialize game progress for a new session
- * Creates a record in game_progress table if it doesn't exist
+ * Creates a record in game_progress table if it doesn't exist.
+ * If insert fails (e.g. after DB wipe), resets localStorage and retries.
  */
 export async function initializeSession() {
     const sessionId = getOrCreateSessionId()
@@ -35,17 +55,16 @@ export async function initializeSession() {
             .single()
 
         if (fetchError && fetchError.code !== 'PGRST116') {
-            // PGRST116 = no rows found, which is expected for new sessions
             throw fetchError
         }
 
         if (!existing) {
-            // Create new game progress record
+            // Try to insert with current session ID
             const { data, error: insertError } = await supabase
                 .from('game_progress')
                 .insert({
                     user_session_id: sessionId,
-                    tickets: 7, // Start with 7 tickets
+                    tickets: 7,
                     last_login_date: new Date().toISOString().split('T')[0],
                     consecutive_days: 1,
                 })
@@ -53,34 +72,75 @@ export async function initializeSession() {
                 .single()
 
             if (insertError) {
-                console.error('Insert error details:', {
-                    message: insertError.message,
-                    code: insertError.code,
-                    details: insertError.details,
-                    hint: insertError.hint,
-                })
-                throw insertError
+                console.warn('Insert failed, clearing stale localStorage and retrying with fresh session...', insertError.code || insertError.message)
+
+                // Clear all stale localStorage and generate a brand-new session ID
+                const freshId = clearAndCreateFreshSession()
+
+                // Retry with fresh ID
+                const { data: retryData, error: retryError } = await supabase
+                    .from('game_progress')
+                    .insert({
+                        user_session_id: freshId,
+                        tickets: 7,
+                        last_login_date: new Date().toISOString().split('T')[0],
+                        consecutive_days: 1,
+                    })
+                    .select()
+                    .single()
+
+                if (retryError) {
+                    console.warn('Retry insert also failed, using local fallback:', retryError.message)
+                    return {
+                        user_session_id: freshId,
+                        tickets: 7,
+                        last_login_date: new Date().toISOString().split('T')[0],
+                        consecutive_days: 1,
+                    }
+                }
+                return retryData
             }
             return data
         }
 
         return existing
     } catch (error: any) {
-        console.error('Error initializing session:', {
-            message: error?.message || 'Unknown error',
-            code: error?.code,
-            details: error?.details,
-            hint: error?.hint,
-            full: error
-        })
-        throw error
+        console.warn('initializeSession error, using local fallback:', error?.message || error)
+        // Instead of crashing, return a safe default
+        const fallbackId = getOrCreateSessionId()
+        return {
+            user_session_id: fallbackId,
+            tickets: 7,
+            last_login_date: new Date().toISOString().split('T')[0],
+            consecutive_days: 1,
+        }
     }
 }
 
 // ==================== GAME PROGRESS ====================
 
+// localStorage fallback key
+const LOCAL_PROGRESS_KEY = 'memoryOdysseyProgress'
+
+function getLocalProgress() {
+    try {
+        const raw = localStorage.getItem(LOCAL_PROGRESS_KEY)
+        if (raw) return JSON.parse(raw)
+    } catch { }
+    return {
+        tickets: 7,
+        last_login_date: new Date().toISOString().split('T')[0],
+        consecutive_days: 1,
+    }
+}
+
+function setLocalProgress(data: any) {
+    try { localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(data)) } catch { }
+}
+
 /**
  * Get current game progress (tickets, streak, etc.)
+ * Falls back to localStorage if Supabase is unavailable.
  */
 export async function getGameProgress() {
     const sessionId = getOrCreateSessionId()
@@ -97,17 +157,17 @@ export async function getGameProgress() {
                 // No record found, initialize new session
                 return await initializeSession()
             }
-            throw error
+            // Any other error — use local fallback silently
+            console.warn('Supabase unavailable, using local progress:', error?.code || error?.message || error)
+            return getLocalProgress()
         }
 
+        // Sync to local as backup
+        setLocalProgress(data)
         return data
     } catch (error: any) {
-        console.error('Error getting game progress:', {
-            message: error?.message || 'Unknown error',
-            code: error?.code,
-            details: error?.details
-        })
-        throw error
+        console.warn('getGameProgress fallback to local:', error?.message || error)
+        return getLocalProgress()
     }
 }
 
@@ -119,36 +179,41 @@ export async function updateTickets(change: number) {
     const sessionId = getOrCreateSessionId()
 
     try {
-        // Get current tickets
         const progress = await getGameProgress()
-        const newTickets = Math.max(0, Math.min(7, progress.tickets + change))
+        const newTickets = Math.max(0, Math.min(7, (progress.tickets ?? 0) + change))
 
-        // Update tickets
-        const { data, error } = await supabase
-            .from('game_progress')
-            .update({
-                tickets: newTickets,
-                updated_at: new Date().toISOString(),
-            })
-            .eq('user_session_id', sessionId)
-            .select()
-            .single()
+        // Try Supabase
+        try {
+            const { data, error } = await supabase
+                .from('game_progress')
+                .update({ tickets: newTickets, updated_at: new Date().toISOString() })
+                .eq('user_session_id', sessionId)
+                .select()
+                .single()
 
-        if (error) throw error
-        return data
+            if (!error && data) {
+                setLocalProgress(data)
+                return data
+            }
+        } catch (_) { }
+
+        // Supabase failed — update local only
+        const updated = { ...progress, tickets: newTickets }
+        setLocalProgress(updated)
+        return updated
     } catch (error: any) {
-        console.error('Error updating tickets:', {
-            message: error?.message || 'Unknown error',
-            code: error?.code,
-            sessionId: sessionId
-        })
-        throw error
+        console.warn('updateTickets fallback:', error?.message || error)
+        // Last resort: just update local
+        const local = getLocalProgress()
+        const updated = { ...local, tickets: Math.max(0, Math.min(7, (local.tickets ?? 0) + change)) }
+        setLocalProgress(updated)
+        return updated
     }
 }
 
 /**
  * Update login streak and award daily ticket
- * Checks if user logged in today, awards ticket if not
+ * Falls back to localStorage if Supabase is unavailable.
  */
 export async function updateLoginStreak() {
     const sessionId = getOrCreateSessionId()
@@ -158,43 +223,53 @@ export async function updateLoginStreak() {
         const progress = await getGameProgress()
         const lastLogin = progress.last_login_date
 
-        // If already logged in today, do nothing
+        // Already logged in today
         if (lastLogin === today) {
             return { awarded: false, ...progress }
         }
 
-        // Calculate if streak continues
         const yesterday = new Date()
         yesterday.setDate(yesterday.getDate() - 1)
         const yesterdayStr = yesterday.toISOString().split('T')[0]
 
         const isConsecutive = lastLogin === yesterdayStr
-        const newConsecutiveDays = isConsecutive ? progress.consecutive_days + 1 : 1
+        const newConsecutiveDays = isConsecutive ? (progress.consecutive_days ?? 1) + 1 : 1
+        const newTickets = Math.min(7, (progress.tickets ?? 0) + 1)
 
-        // Award 1 ticket (max 7)
-        const newTickets = Math.min(7, progress.tickets + 1)
+        const updated = {
+            ...progress,
+            tickets: newTickets,
+            last_login_date: today,
+            consecutive_days: newConsecutiveDays,
+        }
 
-        // Update database
-        const { data, error } = await supabase
-            .from('game_progress')
-            .update({
-                tickets: newTickets,
-                last_login_date: today,
-                consecutive_days: newConsecutiveDays,
-                updated_at: new Date().toISOString(),
-            })
-            .eq('user_session_id', sessionId)
-            .select()
-            .single()
+        // Try Supabase first
+        try {
+            const { data, error } = await supabase
+                .from('game_progress')
+                .update({
+                    tickets: newTickets,
+                    last_login_date: today,
+                    consecutive_days: newConsecutiveDays,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('user_session_id', sessionId)
+                .select()
+                .single()
 
-        if (error) throw error
-        return { awarded: true, ticketsAdded: 1, ...data }
+            if (!error && data) {
+                setLocalProgress(data)
+                return { awarded: true, ticketsAdded: 1, ...data }
+            }
+        } catch (_) { }
+
+        // Supabase failed — update local only
+        setLocalProgress(updated)
+        return { awarded: true, ticketsAdded: 1, ...updated }
+
     } catch (error: any) {
-        console.error('Error updating login streak:', {
-            message: error?.message || 'Unknown error',
-            code: error?.code
-        })
-        throw error
+        console.warn('updateLoginStreak fallback:', error?.message || error)
+        return { awarded: false, tickets: getLocalProgress().tickets }
     }
 }
 
@@ -209,19 +284,24 @@ export async function saveQuizScore(score: number, totalQuestions: number) {
     try {
         const { data, error } = await supabase
             .from('quiz_scores')
-            .insert({
-                user_session_id: sessionId,
-                score,
-                total_questions: totalQuestions,
-            })
+            .upsert(
+                {
+                    user_session_id: sessionId,
+                    score,
+                    total_questions: totalQuestions,
+                },
+                { onConflict: 'user_session_id' }
+            )
             .select()
-            .single()
+            .maybeSingle()
 
-        if (error) throw error
+        if (error) {
+            console.warn('saveQuizScore non-critical error:', error)
+        }
         return data
     } catch (error) {
-        console.error('Error saving quiz score:', error)
-        throw error
+        console.warn('saveQuizScore failed (non-critical):', error)
+        return null
     }
 }
 
@@ -259,33 +339,24 @@ export async function saveMemoryMatchScore(moves: number, timeSeconds: number) {
     try {
         const { data, error } = await supabase
             .from('memory_match_scores')
-            .insert({
-                user_session_id: sessionId,
-                moves,
-                time_seconds: timeSeconds,
-            })
+            .upsert(
+                {
+                    user_session_id: sessionId,
+                    moves,
+                    time_seconds: timeSeconds,
+                },
+                { onConflict: 'user_session_id' }
+            )
             .select()
-            .single()
+            .maybeSingle()
 
         if (error) {
-            console.error('Error saving memory match score:', {
-                message: error.message,
-                code: error.code,
-                details: error.details,
-                hint: error.hint
-            })
-            throw error
+            console.warn('saveMemoryMatchScore non-critical error:', error)
         }
         return data
-    } catch (error: any) {
-        console.error('Failed to save memory match score:', {
-            message: error?.message || 'Unknown error',
-            code: error?.code,
-            details: error?.details,
-            name: error?.name,
-            stack: error?.stack
-        })
-        throw error
+    } catch (error) {
+        console.warn('saveMemoryMatchScore failed (non-critical):', error)
+        return null
     }
 }
 
@@ -323,19 +394,24 @@ export async function saveCatchLoveScore(score: number, heartsCaught: number) {
     try {
         const { data, error } = await supabase
             .from('catch_love_scores')
-            .insert({
-                user_session_id: sessionId,
-                score,
-                hearts_caught: heartsCaught,
-            })
+            .upsert(
+                {
+                    user_session_id: sessionId,
+                    score,
+                    hearts_caught: heartsCaught,
+                },
+                { onConflict: 'user_session_id' }
+            )
             .select()
-            .single()
+            .maybeSingle()
 
-        if (error) throw error
+        if (error) {
+            console.warn('saveCatchLoveScore non-critical error:', error)
+        }
         return data
     } catch (error) {
-        console.error('Error saving catch love score:', error)
-        throw error
+        console.warn('saveCatchLoveScore failed (non-critical):', error)
+        return null
     }
 }
 
@@ -380,8 +456,8 @@ export async function getScratchHistory() {
         if (error) throw error
         return data || []
     } catch (error) {
-        console.error('Error getting scratch history:', error)
-        throw error
+        console.warn('Error getting scratch history, returning empty:', error)
+        return []
     }
 }
 
@@ -390,23 +466,34 @@ export async function getScratchHistory() {
  */
 export async function saveScratchHistory(day: number) {
     const sessionId = getOrCreateSessionId()
+    const today = new Date().toISOString().split('T')[0]
 
     try {
         const { data, error } = await supabase
             .from('scratch_history')
-            .insert({
-                user_session_id: sessionId,
-                day,
-                scratched_at: new Date().toISOString().split('T')[0],
-            })
+            .upsert(
+                {
+                    user_session_id: sessionId,
+                    day,
+                    scratched_at: today,
+                },
+                { ignoreDuplicates: true }
+            )
             .select()
-            .single()
+            .maybeSingle()
 
-        if (error) throw error
+        // Ignore duplicate key errors (code 23505) - it just means already saved
+        if (error && error.code !== '23505') {
+            console.error('Error saving scratch history:', JSON.stringify(error, null, 2))
+        } else if (error?.code === '23505') {
+            console.log('ℹ️ Scratch history already exists for today, skipping.')
+        }
+
         return data
     } catch (error) {
-        console.error('Error saving scratch history:', error)
-        throw error
+        // Don't rethrow - just log and continue
+        console.warn('saveScratchHistory non-critical error:', error)
+        return null
     }
 }
 

@@ -14,9 +14,9 @@ interface FallingObject {
     emoji: string
 }
 
-const GAME_DURATION = 60 // seconds
+const GAME_DURATION = 20 // seconds
 const MAX_OBJECTS = 12 // Limit simultaneous falling objects for performance
-const FALLING_CHAR = '•' // Simple dot for better performance
+const FALLING_CHAR = '💖' // Simple dot for better performance
 
 export default function CatchLovePage() {
     const router = useRouter()
@@ -26,6 +26,7 @@ export default function CatchLovePage() {
     const [isGameOver, setIsGameOver] = useState(false)
     const [basketPosition, setBasketPosition] = useState(50) // percentage
     const [fallingObjects, setFallingObjects] = useState<FallingObject[]>([])
+    const [floatingScores, setFloatingScores] = useState<{ id: number, x: number, y: number }[]>([])
     const [isSaving, setIsSaving] = useState(false)
     const [hasDeductedTicket, setHasDeductedTicket] = useState(false)
     const [heartsCaught, setHeartsCaught] = useState(0)
@@ -52,7 +53,9 @@ export default function CatchLovePage() {
         setTimeLeft(GAME_DURATION)
         setIsPlaying(true)
         setIsGameOver(false)
+        setIsGameOver(false)
         setFallingObjects([])
+        setFloatingScores([])
         nextIdRef.current = 0
     }
 
@@ -145,9 +148,18 @@ export default function CatchLovePage() {
                         obj.x >= basketPosition - basketWidth / 2 &&
                         obj.x <= basketPosition + basketWidth / 2
                     ) {
-                        setScore(s => s + 10)
+                        setScore(s => s + 20)
                         setHeartsCaught(h => h + 1)
                         obj.y = 200 // Remove from screen
+
+                        // Add floating score
+                        const scoreId = Date.now() + Math.random()
+                        setFloatingScores(prev => [...prev, { id: scoreId, x: obj.x, y: basketY - 10 }])
+
+                        // Remove floating score after animation
+                        setTimeout(() => {
+                            setFloatingScores(prev => prev.filter(s => s.id !== scoreId))
+                        }, 800)
                     }
                 })
 
@@ -168,143 +180,133 @@ export default function CatchLovePage() {
     }
 
     return (
-        <div className="min-h-screen p-4 md:p-8">
-            <div className="max-w-4xl mx-auto">
-                {/* Header */}
-                <div className="flex justify-between items-center mb-8">
+        <div className="h-[100dvh] w-full overflow-hidden bg-gradient-to-br from-pink-50 to-rose-100 flex flex-col relative touch-action-none select-none">
+            <div className="w-full max-w-lg mx-auto h-full flex flex-col p-4">
+                {/* Header - Compact */}
+                <div className="flex justify-between items-center mb-4 shrink-0 z-20 relative">
                     <motion.button
                         onClick={() => router.push('/lobby')}
-                        className="text-primary-600 hover:text-primary-700 font-heading"
-                        whileHover={{ x: -5 }}
+                        className="bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-sm text-rose-500 hover:bg-white transition-colors"
+                        whileTap={{ scale: 0.95 }}
                     >
-                        ← Kembali ke Lobby
+                        <span className="sr-only">Back</span>
+                        ←
                     </motion.button>
 
                     {isPlaying && (
-                        <div className="flex gap-4">
-                            <div className="glass rounded-lg px-4 py-2">
-                                <span className="font-heading font-semibold">⏱️ {timeLeft}s</span>
+                        <div className="flex gap-3 text-sm font-bold">
+                            <div className="bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-rose-100 text-rose-600">
+                                ⏱️ {timeLeft}s
                             </div>
-                            <div className="glass rounded-lg px-4 py-2">
-                                <span className="font-heading font-semibold">🎯 {score}</span>
+                            <div className="bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-rose-100 text-rose-600">
+                                🎯 {score}
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* Title */}
-                <motion.div
-                    className="text-center mb-8"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                >
-                    <h1 className="text-4xl md:text-5xl font-heading font-bold gradient-text mb-2">
-                        💝 Catch the Love
-                    </h1>
-                    <p className="text-gray-700 font-body">
-                        Tangkap semua cinta yang jatuh!
-                    </p>
-                </motion.div>
+                {/* Game Container - Fills remaining space */}
+                <div className="flex-1 relative w-full h-full min-h-0 flex flex-col justify-center">
 
-                {!isPlaying && !isGameOver ? (
-                    /* Start Screen */
-                    <motion.div
-                        className="glass rounded-3xl p-8 text-center"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                    >
-                        <div className="text-6xl mb-4">💝</div>
-                        <h2 className="text-2xl font-heading font-bold mb-4">
-                            Cara Bermain
-                        </h2>
-                        <p className="text-gray-700 font-body mb-6">
-                            Gerakkan keranjang (🧺) menggunakan mouse atau jari untuk menangkap titik-titik yang jatuh!<br />
-                            Kamu punya 60 detik untuk mengumpulkan score sebanyak-banyaknya!
-                        </p>
-                        <Button variant="primary" size="lg" onClick={startGame}>
-                            Mulai Permainan 🎮
-                        </Button>
-                    </motion.div>
-                ) : isGameOver ? (
-                    /* Game Over Screen */
-                    <motion.div
-                        className="glass rounded-3xl p-8 text-center"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                    >
-                        <div className="text-7xl mb-4">
-                            {score >= 500 ? '🏆' : score >= 300 ? '🌟' : '💕'}
-                        </div>
-                        <h2 className="text-4xl font-heading font-bold gradient-text mb-4">
-                            {score >= 500 ? 'Luar Biasa!' : score >= 300 ? 'Bagus Banget!' : 'Good Try!'}
-                        </h2>
-
-                        <div className="text-6xl font-bold text-primary-500 mb-2">
-                            {score} poin
-                        </div>
-
-                        <p className="text-gray-700 font-body mb-6">
-                            {score >= 500
-                                ? 'Kamu hebat banget! Seperti kamu menangkap hatiku 💖'
-                                : score >= 300
-                                    ? 'Bagus sayang! Kamu selalu bisa bikin aku tersenyum 😊'
-                                    : 'Tetap manis! Yang penting kita bersenang-senang bareng 🥰'
-                            }
-                        </p>
-
-                        <div className="space-y-3">
-                            <Button variant="primary" size="lg" onClick={startGame} className="w-full">
-                                Main Lagi
+                    {!isPlaying && !isGameOver ? (
+                        /* Start Screen */
+                        <motion.div
+                            className="bg-white/60 backdrop-blur-md rounded-3xl p-6 text-center shadow-xl border border-white/50 mx-4"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                        >
+                            <div className="text-6xl mb-4 animate-bounce">💝</div>
+                            <h1 className="text-2xl font-bold text-rose-600 mb-2 font-heading">Catch the Love</h1>
+                            <p className="text-rose-900/70 text-sm mb-6 leading-relaxed">
+                                Gerakkan keranjang (🧺) untuk menangkap cinta!
+                                <br />Jangan biarkan hatiku jatuh 🥺
+                            </p>
+                            <Button variant="primary" size="lg" onClick={startGame} className="w-full shadow-rose-200 shadow-lg">
+                                Mulai Main 🎮
                             </Button>
-                            <Button variant="secondary" size="md" onClick={() => router.push('/lobby')} className="w-full">
-                                Kembali ke Lobby
-                            </Button>
-                        </div>
-                    </motion.div>
-                ) : (
-                    /* Game Area */
-                    <div
-                        ref={gameAreaRef}
-                        className="relative w-full h-[600px] glass rounded-3xl overflow-hidden cursor-none"
-                        onMouseMove={(e) => handleMove(e.clientX)}
-                        onTouchMove={(e) => handleMove(e.touches[0].clientX)}
-                    >
-                        {/* Falling Objects - Plain divs for performance */}
-                        {fallingObjects.map(obj => (
+                        </motion.div>
+                    ) : isGameOver ? (
+                        /* Game Over Screen */
+                        <motion.div
+                            className="bg-white/80 backdrop-blur-md rounded-3xl p-8 text-center shadow-xl border border-white/50 mx-4"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                        >
+                            <div className="text-7xl mb-4">
+                                {score >= 500 ? '🏆' : score >= 300 ? '🌟' : '💕'}
+                            </div>
+                            <h2 className="text-3xl font-bold text-rose-600 mb-2">
+                                {score >= 500 ? 'Perfect!' : score >= 300 ? 'Great Job!' : 'Good Try!'}
+                            </h2>
+                            <div className="text-5xl font-black text-rose-500 mb-6 tracking-tight">
+                                {score}
+                            </div>
+
+                            <div className="space-y-3">
+                                <Button variant="primary" size="lg" onClick={startGame} className="w-full">
+                                    Main Lagi ↺
+                                </Button>
+                                <Button variant="secondary" size="md" onClick={() => router.push('/lobby')} className="w-full bg-white/50">
+                                    Kembali ke Lobby
+                                </Button>
+                            </div>
+                        </motion.div>
+                    ) : (
+                        /* Active Game Area */
+                        <div
+                            ref={gameAreaRef}
+                            className="absolute inset-0 w-full h-full overflow-hidden touch-none"
+                            onMouseMove={(e) => handleMove(e.clientX)}
+                            onTouchMove={(e) => handleMove(e.touches[0].clientX)}
+                        >
+                            {/* Falling Objects */}
+                            {fallingObjects.map(obj => (
+                                <div
+                                    key={obj.id}
+                                    className="absolute text-4xl leading-none select-none pointer-events-none"
+                                    style={{
+                                        left: `${obj.x}%`,
+                                        top: `${obj.y}%`,
+                                        transform: 'translate(-50%, -50%)',
+                                        willChange: 'top'
+                                    }}
+                                >
+                                    {obj.emoji}
+                                </div>
+                            ))}
+
+                            {/* Floating Scores */}
+                            {floatingScores.map(fs => (
+                                <motion.div
+                                    key={fs.id}
+                                    initial={{ opacity: 1, y: 0, scale: 0.8 }}
+                                    animate={{ opacity: 0, y: -50, scale: 1.2 }}
+                                    transition={{ duration: 0.8 }}
+                                    className="absolute text-xl font-bold text-rose-600 pointer-events-none z-10"
+                                    style={{
+                                        left: `${fs.x}%`,
+                                        top: `${fs.y}%`,
+                                        transform: 'translateX(-50%)',
+                                        textShadow: '0 2px 4px rgba(255,255,255,0.8)'
+                                    }}
+                                >
+                                    +20
+                                </motion.div>
+                            ))}
+
+                            {/* Basket */}
                             <div
-                                key={obj.id}
-                                className="absolute text-4xl font-bold text-gray-700 transition-none"
+                                className="absolute bottom-8 text-6xl leading-none transition-transform duration-75 ease-out will-change-transform select-none pointer-events-none"
                                 style={{
-                                    left: `${obj.x}%`,
-                                    top: `${obj.y}%`,
-                                    transform: 'translate(-50%, -50%)',
-                                    willChange: 'top'
+                                    left: `${basketPosition}%`,
+                                    transform: 'translateX(-50%)',
                                 }}
                             >
-                                {obj.emoji}
+                                🧺
                             </div>
-                        ))}
-
-                        {/* Basket - No animation for better performance */}
-                        <div
-                            className="absolute bottom-[10%] text-5xl transition-none"
-                            style={{
-                                left: `${basketPosition}%`,
-                                transform: 'translateX(-50%)',
-                                willChange: 'left'
-                            }}
-                        >
-                            🧺
                         </div>
-
-                        {/* Instructions */}
-                        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 glass rounded-lg px-4 py-2">
-                            <p className="text-sm font-body text-gray-700">
-                                Gerakkan mouse/jari untuk mengontrol keranjang!
-                            </p>
-                        </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </div>
     )
