@@ -79,7 +79,7 @@ export default function AuthPage() {
                                 filter: 'drop-shadow(0 2px 10px rgba(245, 158, 11, 0.2))'
                             }}
                         >
-                            Tecantikku<br />Revi
+                            Anniversary<br />Revi & Muel
                         </h1>
 
                         <p className="text-sm font-medium leading-relaxed text-white/40 font-heading">
