@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { getTimeSinceAnniversary } from '@/lib/utils/dates'
@@ -17,7 +17,6 @@ export default function HomePage() {
   const [timeElapsed, setTimeElapsed] = useState(getTimeSinceAnniversary(ANNIVERSARY_DATE))
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
-  const [hasInteracted, setHasInteracted] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
 
@@ -32,38 +31,33 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [router])
 
-  // Music on first interaction
-  const tryPlayMusic = useCallback(() => {
-    if (!hasInteracted && audioRef.current) {
-      audioRef.current.volume = 0.4
-      audioRef.current.play().catch(() => { })
-      setHasInteracted(true)
-    }
-  }, [hasInteracted])
-
+  // Auto-play musik begitu preloader selesai
+  // (user sudah interact di auth page → browser izinkan autoplay)
   useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    el.addEventListener('click', tryPlayMusic, { once: true })
-    el.addEventListener('touchstart', tryPlayMusic, { once: true })
-    return () => {
-      el.removeEventListener('click', tryPlayMusic)
-      el.removeEventListener('touchstart', tryPlayMusic)
+    if (!isPreloading && isAuthenticated && audioRef.current) {
+      audioRef.current.volume = 0.4
+      audioRef.current.play()
+        .then(() => { setIsMuted(false) })
+        .catch(() => {
+          // Browser blokir autoplay — fallback: play saat user pertama kali sentuh layar
+          const tryOnTouch = () => {
+            audioRef.current?.play().catch(() => { })
+            document.removeEventListener('click', tryOnTouch)
+            document.removeEventListener('touchstart', tryOnTouch)
+          }
+          document.addEventListener('click', tryOnTouch, { once: true })
+          document.addEventListener('touchstart', tryOnTouch, { once: true })
+        })
     }
-  }, [tryPlayMusic, isAuthenticated])
+  }, [isPreloading, isAuthenticated])
 
   const toggleMute = () => {
     if (!audioRef.current) return
-    if (!hasInteracted) {
-      audioRef.current.volume = 0.4
-      audioRef.current.play().catch(() => { })
-      setHasInteracted(true)
-      setIsMuted(false)
-    } else {
-      const next = !isMuted
-      setIsMuted(next)
-      audioRef.current.muted = next
-    }
+    const next = !isMuted
+    setIsMuted(next)
+    audioRef.current.muted = next
+    // Jika belum pernah play, mulai sekarang
+    if (!next) audioRef.current.play().catch(() => { })
   }
 
   if (!isAuthenticated) return null
@@ -87,7 +81,7 @@ export default function HomePage() {
         className="fixed top-5 right-5 z-50 w-10 h-10 rounded-full flex items-center justify-center border border-white/20 hover:scale-110 active:scale-95 transition-all duration-200"
         style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}
       >
-        {isMuted || !hasInteracted
+        {isMuted
           ? <VolumeX size={15} className="text-white/60" />
           : <Volume2 size={15} className="text-yellow-200/80" />
         }
