@@ -8,7 +8,7 @@ import { StarField } from '@/components/ui/StarField'
 import { Trophy, ChevronLeft, Ticket, Lock } from 'lucide-react'
 
 // 🔒 Scratch-off dikunci sampai tanggal ini
-const SCRATCH_UNLOCK_DATE = new Date('2026-04-17T00:00:00')
+const SCRATCH_UNLOCK_DATE = new Date('2026-04-19T00:00:00')
 const isScratchLocked = new Date() < SCRATCH_UNLOCK_DATE
 
 // Game Data with more visual focus
@@ -65,6 +65,9 @@ export default function LobbyPage() {
                 const auth = localStorage.getItem('memoryOdysseyAuth')
                 if (!auth) { router.push('/auth'); return }
                 setIsAuthenticated(true)
+
+                // Prefetch semua route game agar navigasi terasa instan
+                GAME_ZONES.forEach(g => router.prefetch(g.path))
 
                 const streakResult = await updateLoginStreak()
                 if (streakResult.awarded) {
@@ -164,8 +167,8 @@ export default function LobbyPage() {
                                 transition={{ delay: i * 0.1 }}
                                 onClick={() => handleGameClick(game)}
                                 className={`group relative flex items-center gap-6 p-6 rounded-3xl border border-white/10 bg-white/5 transition-all duration-300 backdrop-blur-md text-left w-full overflow-hidden ${isLocked
-                                        ? 'opacity-60 cursor-not-allowed'
-                                        : 'hover:bg-white/10 hover:border-white/20 active:scale-[0.98]'
+                                    ? 'opacity-60 cursor-not-allowed'
+                                    : 'hover:bg-white/10 hover:border-white/20 active:scale-[0.98]'
                                     }`}
                             >
                                 {/* Hover Glow (only if not locked) */}
@@ -182,13 +185,13 @@ export default function LobbyPage() {
                                         {game.title}
                                     </h3>
                                     <p className="text-xs text-white/50 mb-3 truncate">
-                                        {isLocked ? 'Dibuka tanggal 17 April 2026' : game.desc}
+                                        {isLocked ? 'Dibuka tanggal 19 April 2026' : game.desc}
                                     </p>
 
                                     {/* Price / Lock Badge */}
                                     <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-medium tracking-wide uppercase border ${isLocked
-                                            ? 'bg-white/5 border-white/10 text-white/40'
-                                            : 'bg-black/40 border-white/5 text-white/70'
+                                        ? 'bg-white/5 border-white/10 text-white/40'
+                                        : 'bg-black/40 border-white/5 text-white/70'
                                         }`}>
                                         {isLocked ? (
                                             <><Lock className="w-2.5 h-2.5" /> Terkunci</>) : game.price === 0 ? (

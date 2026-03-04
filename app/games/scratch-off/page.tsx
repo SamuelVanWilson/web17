@@ -8,7 +8,7 @@ import { SCRATCH_OFF_MESSAGES } from '@/lib/constants/gameData'
 import { getScratchHistory, saveScratchHistory } from '@/lib/supabase/helpers'
 
 // 🔒 Game dikunci sampai tanggal ini
-const UNLOCK_DATE = new Date('2026-04-17T00:00:00')
+const UNLOCK_DATE = new Date('2026-04-19T00:00:00')
 
 function LockedScreen({ router }: { router: ReturnType<typeof useRouter> }) {
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
@@ -60,7 +60,7 @@ function LockedScreen({ router }: { router: ReturnType<typeof useRouter> }) {
                     </h1>
                     <p className="text-purple-300/80 text-sm leading-relaxed">
                         Kejurannya belum saatnya dibuka 🎁<br />
-                        Sabar ya, nanti tanggal 17 April baru di buka!
+                        Sabar ya, nanti tanggal 19 April baru di buka!
                     </p>
                 </div>
 
@@ -92,7 +92,7 @@ function LockedScreen({ router }: { router: ReturnType<typeof useRouter> }) {
                     </div>
                 </div>
 
-                <p className="text-purple-400/50 text-xs italic">17 April 2026 ✨</p>
+                <p className="text-purple-400/50 text-xs italic">19 April 2026 ✨</p>
 
                 <button
                     onClick={() => router.push('/lobby')}

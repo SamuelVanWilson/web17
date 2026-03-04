@@ -8,10 +8,12 @@ import { ANNIVERSARY_DATE, MEMORY_TIMELINE } from '@/lib/constants/gameData'
 import Button from '@/components/ui/Button'
 import { FloatingBackground } from '@/components/ui/FloatingBackground'
 import { StarField } from '@/components/ui/StarField'
+import { PreloaderScreen } from '@/components/ui/PreloaderScreen'
 import { ChevronDown, Volume2, VolumeX } from 'lucide-react'
 
 export default function HomePage() {
   const router = useRouter()
+  const [isPreloading, setIsPreloading] = useState(true)
   const [timeElapsed, setTimeElapsed] = useState(getTimeSinceAnniversary(ANNIVERSARY_DATE))
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -24,6 +26,8 @@ export default function HomePage() {
     const auth = localStorage.getItem('memoryOdysseyAuth')
     if (!auth) { router.push('/auth'); return }
     setIsAuthenticated(true)
+    // Prefetch lobby route agar navigasi ke lobby terasa instan
+    router.prefetch('/lobby')
     const interval = setInterval(() => setTimeElapsed(getTimeSinceAnniversary(ANNIVERSARY_DATE)), 1000)
     return () => clearInterval(interval)
   }, [router])
@@ -63,6 +67,11 @@ export default function HomePage() {
   }
 
   if (!isAuthenticated) return null
+
+  // Tampilkan preloader sebelum konten utama
+  if (isPreloading) {
+    return <PreloaderScreen onComplete={() => setIsPreloading(false)} />
+  }
 
   return (
     <div
