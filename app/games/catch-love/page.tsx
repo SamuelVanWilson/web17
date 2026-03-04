@@ -218,11 +218,11 @@ export default function CatchLovePage() {
                             <div className="text-6xl mb-4 animate-bounce">💝</div>
                             <h1 className="text-2xl font-bold text-rose-600 mb-2 font-heading">Catch the Love</h1>
                             <p className="text-rose-900/70 text-sm mb-6 leading-relaxed">
-                                Gerakkan keranjang (🧺) untuk menangkap cinta!
-                                <br />Jangan biarkan hatiku jatuh 🥺
+                                Pokoknya tangkep semua hati, kalau kamu sayang aku
+                                <br />Tangkeep semuaa pokokknyaa!!!
                             </p>
                             <Button variant="primary" size="lg" onClick={startGame} className="w-full shadow-rose-200 shadow-lg">
-                                Mulai Main 🎮
+                                Mulai Bermain
                             </Button>
                         </motion.div>
                     ) : isGameOver ? (

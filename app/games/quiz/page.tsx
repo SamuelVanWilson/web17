@@ -100,24 +100,24 @@ export default function QuizPage() {
     const getScoreMessage = () => {
         const percentage = (score / QUIZ_QUESTIONS.length) * 100
         if (percentage === 100) return {
-            emoji: '🏆',
-            title: 'Perfect Score, Sayang!',
-            message: 'Kamu benar-benar inget semua tentang kita! I love you so much! 💖'
+            emoji: '💯',
+            title: 'NAH KALAU INI BENER SAYANG NII',
+            message: 'eviii keren inget semuaa, udah ekspek sihh, kan kita sama sama sayang🥰'
         }
         if (percentage >= 80) return {
-            emoji: '🌟',
-            title: 'Luar Biasa!',
-            message: 'Kamu inget hampir semua! Kamu memang perhatian banget 💕'
+            emoji: '😒',
+            title: 'KOK GAK BENER SEMUAA',
+            message: 'pasti kamu gak sayang aku yaa, makanya gak inget semuanya'
         }
         if (percentage >= 60) return {
-            emoji: '💝',
-            title: 'Bagus Banget!',
-            message: 'Kamu inget banyak tentang kita. Sweet! 🥰'
+            emoji: '🙄',
+            title: 'kok segini doang',
+            message: 'pasti pikun yaak makanya cuman inget segitu'
         }
         return {
-            emoji: '💕',
-            title: 'Tetap Manis!',
-            message: 'Gapapa sayang, yang penting kita bersama! Let\'s make more memories! ✨'
+            emoji: '😤',
+            title: 'apa-apaan nihh',
+            message: 'PARAH BANGETT SII, MASA BENER SEDIKIT'
         }
     }
 

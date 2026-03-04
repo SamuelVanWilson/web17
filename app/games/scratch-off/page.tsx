@@ -7,8 +7,116 @@ import Button from '@/components/ui/Button'
 import { SCRATCH_OFF_MESSAGES } from '@/lib/constants/gameData'
 import { getScratchHistory, saveScratchHistory } from '@/lib/supabase/helpers'
 
+// 🔒 Game dikunci sampai tanggal ini
+const UNLOCK_DATE = new Date('2026-04-17T00:00:00')
+
+function LockedScreen({ router }: { router: ReturnType<typeof useRouter> }) {
+    const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+
+    useEffect(() => {
+        const tick = () => {
+            const now = new Date()
+            const diff = UNLOCK_DATE.getTime() - now.getTime()
+            if (diff <= 0) {
+                setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+                return
+            }
+            setTimeLeft({
+                days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+                hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+                minutes: Math.floor((diff / (1000 * 60)) % 60),
+                seconds: Math.floor((diff / 1000) % 60),
+            })
+        }
+        tick()
+        const id = setInterval(tick, 1000)
+        return () => clearInterval(id)
+    }, [])
+
+    return (
+        <div className="h-[100dvh] w-full flex flex-col items-center justify-center bg-gradient-to-br from-purple-950 via-indigo-950 to-black relative overflow-hidden select-none px-6">
+            {/* Decorative rings */}
+            <div className="absolute w-[340px] h-[340px] rounded-full border border-purple-500/10 animate-ping" style={{ animationDuration: '4s' }} />
+            <div className="absolute w-[260px] h-[260px] rounded-full border border-purple-500/20" />
+
+            <motion.div
+                className="z-10 flex flex-col items-center text-center gap-6 max-w-xs"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+            >
+                {/* Lock icon */}
+                <motion.div
+                    className="w-24 h-24 rounded-3xl bg-purple-900/60 border border-purple-500/30 flex items-center justify-center shadow-2xl shadow-purple-900"
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
+                >
+                    <span className="text-5xl">🔒</span>
+                </motion.div>
+
+                <div>
+                    <h1 className="text-2xl font-bold text-white mb-1" style={{ fontFamily: "'Quicksand', sans-serif" }}>
+                        Daily Surprise
+                    </h1>
+                    <p className="text-purple-300/80 text-sm leading-relaxed">
+                        Kejurannya belum saatnya dibuka 🎁<br />
+                        Sabar ya, nanti tanggal 17 April baru di buka!
+                    </p>
+                </div>
+
+                {/* Countdown */}
+                <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-sm">
+                    <p className="text-[10px] uppercase tracking-widest text-purple-300/60 mb-4 font-bold">Dibuka dalam</p>
+                    <div className="grid grid-cols-4 gap-2">
+                        {[
+                            { label: 'Hari', value: timeLeft.days },
+                            { label: 'Jam', value: timeLeft.hours },
+                            { label: 'Menit', value: timeLeft.minutes },
+                            { label: 'Detik', value: timeLeft.seconds },
+                        ].map(({ label, value }) => (
+                            <div key={label} className="flex flex-col items-center">
+                                <span className="text-3xl font-bold text-white" style={{ fontFamily: "'Quicksand', sans-serif" }}>
+                                    {String(value).padStart(2, '0')}
+                                </span>
+                                <span className="text-[9px] uppercase tracking-widest text-purple-400/60 mt-1 font-bold">{label}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-4 h-1 bg-white/5 rounded-full overflow-hidden">
+                        <motion.div
+                            className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
+                            animate={{ opacity: [0.6, 1, 0.6] }}
+                            transition={{ repeat: Infinity, duration: 2 }}
+                            style={{ width: '100%' }}
+                        />
+                    </div>
+                </div>
+
+                <p className="text-purple-400/50 text-xs italic">17 April 2026 ✨</p>
+
+                <button
+                    onClick={() => router.push('/lobby')}
+                    className="mt-2 px-8 py-3 rounded-full text-sm font-semibold text-white/70 border border-white/10 hover:bg-white/10 transition-colors"
+                >
+                    ← Kembali ke Lobby
+                </button>
+            </motion.div>
+        </div>
+    )
+}
+
 export default function ScratchOffPage() {
     const router = useRouter()
+
+    // 🔒 Freeze check — game tidak bisa dimainkan sebelum UNLOCK_DATE
+    if (new Date() < UNLOCK_DATE) {
+        return <LockedScreen router={router} />
+    }
+
+    return <ScratchOffGame router={router} />
+}
+
+function ScratchOffGame({ router }: { router: ReturnType<typeof useRouter> }) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [isScratching, setIsScratching] = useState(false)
     const [scratchPercentage, setScratchPercentage] = useState(0)
@@ -58,33 +166,17 @@ export default function ScratchOffPage() {
                 // Cap di 7 hari
                 const day = Math.min(Math.max(1, daysElapsed), 7)
 
-                console.log('📅 Daily Surprise Date Calculation:', {
-                    firstLoginDate,
-                    today,
-                    daysElapsed,
-                    currentDay: day,
-                    historyCount: history.length,
-                })
-
                 setCurrentDay(day)
 
                 // Cek apakah sudah scratch HARI INI
                 const scratchedToday = history.some(h => h.scratched_at === today)
 
-                console.log('🔍 Scratch History Check:', {
-                    totalHistory: history.length,
-                    scratchedToday,
-                    todayDate: today
-                })
-
                 if (scratchedToday) {
-                    console.log('✅ Already scratched today! Showing completed state.')
                     setHasScratched(true)
                     setIsRevealed(true)
                     isRevealedRef.current = true
                     setScratchPercentage(100)
                 } else {
-                    console.log('🎁 New scratch card available for today!')
                     initializeCanvas()
                 }
             } catch (error) {

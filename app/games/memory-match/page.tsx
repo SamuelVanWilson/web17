@@ -8,18 +8,18 @@ import { updateTickets, saveMemoryMatchScore, getGameProgress } from '@/lib/supa
 
 // Sample memory photos for cards (will be replaced with actual photos)
 const CARD_IMAGES = [
-    '/images/memory/1.svg',
-    '/images/memory/2.svg',
-    '/images/memory/3.svg',
-    '/images/memory/4.svg',
-    '/images/memory/5.svg',
-    '/images/memory/6.svg',
-    '/images/memory/1.svg',
-    '/images/memory/2.svg',
-    '/images/memory/3.svg',
-    '/images/memory/4.svg',
-    '/images/memory/5.svg',
-    '/images/memory/6.svg',
+    '/images/memory/1_1.webp',
+    '/images/memory/2_1.webp',
+    '/images/memory/3_1.webp',
+    '/images/memory/4_1.webp',
+    '/images/memory/5_1.webp',
+    '/images/memory/6_1.webp',
+    '/images/memory/1_2.webp',
+    '/images/memory/2_2.webp',
+    '/images/memory/3_2.webp',
+    '/images/memory/4_2.webp',
+    '/images/memory/5_2.webp',
+    '/images/memory/6_2.webp',
 ]
 
 interface Card {
@@ -27,6 +27,11 @@ interface Card {
     img: string
     isFlipped: boolean
     isMatched: boolean
+}
+
+function getPairId(img: string) {
+    const base = img.substring(img.lastIndexOf('/') + 1) // e.g. "1_2.webp"
+    return base.split('_')[0] // "1"
 }
 
 export default function MemoryMatchPage() {
@@ -152,13 +157,14 @@ export default function MemoryMatchPage() {
                     const firstCard = updatedCards.find(card => card.id === first)
                     const secondCard = updatedCards.find(card => card.id === second)
 
-                    if (firstCard && secondCard && firstCard.img === secondCard.img) {
-                        // Match found!
+                    if (firstCard && secondCard && getPairId(firstCard.img) === getPairId(secondCard.img)) {
+                        // Match found based on prefix, e.g. "6_1.webp" and "6_2.webp"
                         console.log('✅ Match found!', {
                             firstCard: firstCard.img,
                             secondCard: secondCard.img,
                             firstId: first,
-                            secondId: second
+                            secondId: second,
+                            pair: getPairId(firstCard.img)
                         })
 
                         setTimeout(() => {
@@ -314,7 +320,7 @@ export default function MemoryMatchPage() {
                             >
                                 <div className="text-6xl mb-4 animate-bounce">🎉</div>
                                 <h2 className="text-2xl font-bold text-purple-600 mb-2">
-                                    Kamu Menang!
+                                    Yeyy akhirnya selesai jugaa
                                 </h2>
                                 <p className="text-purple-900/70 text-sm mb-6">
                                     Hebat! Kamu menyelesaikan game ini dalam {moves} langkah! 💕

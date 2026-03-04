@@ -70,7 +70,7 @@ export default function HomePage() {
       className="h-screen w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth bg-black"
       style={{ fontFamily: "'Raleway', sans-serif" }}
     >
-      <audio ref={audioRef} src="/audio/bgm.mp3" loop preload="none" />
+      <audio ref={audioRef} src="/audio/backsound.mp3" loop preload="none" />
 
       {/* Music toggle */}
       <button
@@ -177,7 +177,7 @@ export default function HomePage() {
                     className="absolute inset-0 w-full h-full object-cover"
                     onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none' }}
                   >
-                    <source src={`/video/bulan-${memory.month}.mp4`} type="video/mp4" />
+                    <source src={memory.image} type="video/mp4" />
                   </video>
 
                   {/* Fallback */}

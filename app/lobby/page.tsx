@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getGameProgress, updateLoginStreak } from '@/lib/supabase/helpers'
 import { StarField } from '@/components/ui/StarField'
-import { Trophy, ChevronLeft, Ticket } from 'lucide-react'
+import { Trophy, ChevronLeft, Ticket, Lock } from 'lucide-react'
+
+// 🔒 Scratch-off dikunci sampai tanggal ini
+const SCRATCH_UNLOCK_DATE = new Date('2026-04-17T00:00:00')
+const isScratchLocked = new Date() < SCRATCH_UNLOCK_DATE
 
 // Game Data with more visual focus
 const GAME_ZONES = [
@@ -81,6 +85,9 @@ export default function LobbyPage() {
     }, [router])
 
     const handleGameClick = (game: typeof GAME_ZONES[0]) => {
+        if (game.id === 'scratch-off' && isScratchLocked) {
+            return // Game terkunci
+        }
         if (game.price > 0 && tickets < game.price) {
             alert('Tiket kamu habis! Login besok lagi ya 🎫')
             return
@@ -147,50 +154,62 @@ export default function LobbyPage() {
 
                 {/* Game Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 w-full max-w-3xl px-2">
-                    {GAME_ZONES.map((game, i) => (
-                        <motion.button
-                            key={game.id}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: i * 0.1 }}
-                            onClick={() => handleGameClick(game)}
-                            className="group relative flex items-center gap-6 p-6 rounded-3xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all duration-300 backdrop-blur-md text-left w-full overflow-hidden active:scale-[0.98]"
-                        >
-                            {/* Hover Glow */}
-                            <div className={`absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500 bg-gradient-to-r ${game.color}`} />
+                    {GAME_ZONES.map((game, i) => {
+                        const isLocked = game.id === 'scratch-off' && isScratchLocked
+                        return (
+                            <motion.button
+                                key={game.id}
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: i * 0.1 }}
+                                onClick={() => handleGameClick(game)}
+                                className={`group relative flex items-center gap-6 p-6 rounded-3xl border border-white/10 bg-white/5 transition-all duration-300 backdrop-blur-md text-left w-full overflow-hidden ${isLocked
+                                        ? 'opacity-60 cursor-not-allowed'
+                                        : 'hover:bg-white/10 hover:border-white/20 active:scale-[0.98]'
+                                    }`}
+                            >
+                                {/* Hover Glow (only if not locked) */}
+                                {!isLocked && <div className={`absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500 bg-gradient-to-r ${game.color}`} />}
 
-                            {/* Emoji Container */}
-                            <div className={`flex-shrink-0 w-20 h-20 rounded-2xl bg-gradient-to-br ${game.color} flex items-center justify-center text-4xl shadow-xl shadow-black/30 group-hover:scale-110 transition-transform duration-300`}>
-                                {game.emoji}
-                            </div>
-
-                            {/* Text Info */}
-                            <div className="flex-1 min-w-0">
-                                <h3 className="text-lg font-bold text-white group-hover:text-yellow-200 transition-colors truncate" style={{ fontFamily: "'Quicksand', sans-serif" }}>
-                                    {game.title}
-                                </h3>
-                                <p className="text-xs text-white/50 mb-3 truncate">
-                                    {game.desc}
-                                </p>
-
-                                {/* Price Badge */}
-                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/40 text-[10px] font-medium tracking-wide uppercase text-white/70 border border-white/5">
-                                    {game.price === 0 ? (
-                                        <span className="text-green-400">FREE</span>
-                                    ) : (
-                                        <>
-                                            <span className="text-yellow-500">🎫</span> {game.price} TIKET
-                                        </>
-                                    )}
+                                {/* Emoji Container */}
+                                <div className={`flex-shrink-0 w-20 h-20 rounded-2xl bg-gradient-to-br ${game.color} flex items-center justify-center text-4xl shadow-xl shadow-black/30 ${!isLocked ? 'group-hover:scale-110' : ''} transition-transform duration-300`}>
+                                    {isLocked ? '🔒' : game.emoji}
                                 </div>
-                            </div>
 
-                            {/* Play Arrow */}
-                            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                                <ChevronLeft className="w-4 h-4 text-white rotate-180" />
-                            </div>
-                        </motion.button>
-                    ))}
+                                {/* Text Info */}
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-lg font-bold text-white group-hover:text-yellow-200 transition-colors truncate" style={{ fontFamily: "'Quicksand', sans-serif" }}>
+                                        {game.title}
+                                    </h3>
+                                    <p className="text-xs text-white/50 mb-3 truncate">
+                                        {isLocked ? 'Dibuka tanggal 17 April 2026' : game.desc}
+                                    </p>
+
+                                    {/* Price / Lock Badge */}
+                                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-medium tracking-wide uppercase border ${isLocked
+                                            ? 'bg-white/5 border-white/10 text-white/40'
+                                            : 'bg-black/40 border-white/5 text-white/70'
+                                        }`}>
+                                        {isLocked ? (
+                                            <><Lock className="w-2.5 h-2.5" /> Terkunci</>) : game.price === 0 ? (
+                                                <span className="text-green-400">FREE</span>
+                                            ) : (
+                                            <>
+                                                <span className="text-yellow-500">🎫</span> {game.price} TIKET
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Play Arrow (hidden if locked) */}
+                                {!isLocked && (
+                                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+                                        <ChevronLeft className="w-4 h-4 text-white rotate-180" />
+                                    </div>
+                                )}
+                            </motion.button>
+                        )
+                    })}
                 </div>
 
                 {/* Coming Soon Teaser */}
