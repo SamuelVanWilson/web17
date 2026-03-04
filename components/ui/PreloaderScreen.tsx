@@ -28,12 +28,18 @@ const CACHE_DONE_KEY = 'memoryOdysseyCacheDone'
 
 interface PreloaderScreenProps {
     onComplete: () => void
+    /** called whenever progress value updates (0-100) */
+    onProgress?: (progress: number) => void
 }
 
-export function PreloaderScreen({ onComplete }: PreloaderScreenProps) {
+export function PreloaderScreen({ onComplete, onProgress }: PreloaderScreenProps) {
     // Progress hanya boleh naik — floor disimpan di ref
     const progressFloor = useRef(0)
     const [progress, setProgress] = useState(0)
+    // notify parent whenever progress changes
+    useEffect(() => {
+        if (onProgress) onProgress(progress)
+    }, [progress, onProgress])
     const [currentFile, setCurrentFile] = useState('')
     const [phase, setPhase] = useState<'checking' | 'downloading' | 'done'>('checking')
 

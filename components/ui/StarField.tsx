@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 
 interface GlowStar {
     id: number
@@ -29,11 +29,17 @@ interface StarFieldProps {
 }
 
 export const StarField = ({ count = 15 }: StarFieldProps) => {
-    const stars = useMemo(() => generateStars(count), [count])
+    const [stars, setStars] = useState<GlowStar[]>([])
+    const [isHydrated, setIsHydrated] = useState(false)
+
+    useEffect(() => {
+        setIsHydrated(true)
+        setStars(generateStars(count))
+    }, [count])
 
     return (
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-            {stars.map((star) => (
+            {isHydrated && stars.map((star) => (
                 <div
                     key={star.id}
                     className="absolute rounded-full bg-yellow-200"

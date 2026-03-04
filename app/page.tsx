@@ -9,16 +9,27 @@ import Button from '@/components/ui/Button'
 import { FloatingBackground } from '@/components/ui/FloatingBackground'
 import { StarField } from '@/components/ui/StarField'
 import { PreloaderScreen } from '@/components/ui/PreloaderScreen'
-import { ChevronDown, Volume2, VolumeX } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 
 export default function HomePage() {
   const router = useRouter()
   const [isPreloading, setIsPreloading] = useState(true)
   const [timeElapsed, setTimeElapsed] = useState(getTimeSinceAnniversary(ANNIVERSARY_DATE))
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isMuted, setIsMuted] = useState(false)
+  const [preloadProgress, setPreloadProgress] = useState(0)
+  const [audioStarted, setAudioStarted] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
+
+  // always render the audio so it can preload immediately, even before auth
+  const audioElement = (
+    <audio
+      ref={audioRef}
+      src="/audio/backsound.mp3"
+      loop
+      preload="auto"
+    />
+  )
 
   // Auth + timer
   useEffect(() => {
@@ -31,61 +42,63 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [router])
 
-  // Auto-play musik begitu preloader selesai
-  // (user sudah interact di auth page → browser izinkan autoplay)
+  // configure audio object; actual playback triggered later based on progress
   useEffect(() => {
-    if (!isPreloading && isAuthenticated && audioRef.current) {
+    if (audioRef.current) {
       audioRef.current.volume = 0.4
-      audioRef.current.play()
-        .then(() => { setIsMuted(false) })
-        .catch(() => {
-          // Browser blokir autoplay — fallback: play saat user pertama kali sentuh layar
-          const tryOnTouch = () => {
-            audioRef.current?.play().catch(() => { })
-            document.removeEventListener('click', tryOnTouch)
-            document.removeEventListener('touchstart', tryOnTouch)
-          }
-          document.addEventListener('click', tryOnTouch, { once: true })
-          document.addEventListener('touchstart', tryOnTouch, { once: true })
-        })
+      audioRef.current.loop = true
     }
-  }, [isPreloading, isAuthenticated])
+  }, [])
 
-  const toggleMute = () => {
-    if (!audioRef.current) return
-    const next = !isMuted
-    setIsMuted(next)
-    audioRef.current.muted = next
-    // Jika belum pernah play, mulai sekarang
-    if (!next) audioRef.current.play().catch(() => { })
+  // start playing once preloader progress reaches threshold
+  useEffect(() => {
+    // begin when progress nears completion (95%)
+    if (!audioStarted && preloadProgress >= 95 && audioRef.current) {
+      const playPromise = audioRef.current.play()
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          const playOnInteraction = () => {
+            audioRef.current?.play().catch(() => {})
+            document.removeEventListener('click', playOnInteraction)
+            document.removeEventListener('touchstart', playOnInteraction)
+          }
+          document.addEventListener('click', playOnInteraction, { once: true })
+          document.addEventListener('touchstart', playOnInteraction, { once: true })
+        })
+      }
+      setAudioStarted(true)
+    }
+  }, [preloadProgress, audioStarted])
+
+  // render audio even while unauthenticated so it can preload immediately
+  if (!isAuthenticated) {
+    // redirect will happen in effect; meanwhile we still render the audio
+    return audioElement
   }
 
-  if (!isAuthenticated) return null
+  // audioElement already defined earlier
 
   // Tampilkan preloader sebelum konten utama
   if (isPreloading) {
-    return <PreloaderScreen onComplete={() => setIsPreloading(false)} />
+    return (
+      <>
+        {audioElement}
+        <PreloaderScreen
+          onComplete={() => setIsPreloading(false)}
+          onProgress={setPreloadProgress}
+        />
+      </>
+    )
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="h-screen w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth bg-black"
-      style={{ fontFamily: "'Raleway', sans-serif" }}
-    >
-      <audio ref={audioRef} src="/audio/backsound.mp3" loop preload="none" />
-
-      {/* Music toggle */}
-      <button
-        onClick={toggleMute}
-        className="fixed top-5 right-5 z-50 w-10 h-10 rounded-full flex items-center justify-center border border-white/20 hover:scale-110 active:scale-95 transition-all duration-200"
-        style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}
+    <>
+      {audioElement}
+      <div
+        ref={containerRef}
+        className="h-screen w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth bg-black"
+        style={{ fontFamily: "'Raleway', sans-serif" }}
       >
-        {isMuted
-          ? <VolumeX size={15} className="text-white/60" />
-          : <Volume2 size={15} className="text-yellow-200/80" />
-        }
-      </button>
 
       {/* ── HERO ──────────────────────────────────────── */}
       <section className="h-screen w-full snap-center relative flex flex-col items-center justify-center text-center overflow-hidden bg-black">
@@ -295,5 +308,6 @@ export default function HomePage() {
         </motion.div>
       </section>
     </div>
+    </>
   )
 }
